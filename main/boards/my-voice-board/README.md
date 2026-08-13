@@ -82,9 +82,10 @@ idf.py -p /dev/cu.usbserial-XXXX flash monitor
 ## Idle home UI (portrait 240×320)
 
 - Top bar: Wi-Fi + battery (existing)
-- **Idle**: home panel with clock and weather placeholders (temp / humidity shown as `--`, `--°C`, `--%`)
-- **Chat**: home panel hidden; emotion emoji/GIF shown
-- Backlight: 30s after entering idle → 20%; wake/talk restores saved brightness
+- **Idle**: home panel with large clock, date, weather placeholders (`--` / `--°C` / `湿度 --%`), and wake hint `说“小智”开始对话`
+- **Chat**: home panel hidden; emotion emoji/GIF + subtitles shown
+- Backlight: 30s after entering idle → 20% (not written to NVS); leave idle restores saved brightness
+- Live weather/TH: later via `Display::SetHomeEnvironment(...)` (custom HTTP); phase 1 is placeholders only
 
 ## LED Status
 
