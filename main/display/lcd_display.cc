@@ -1215,9 +1215,7 @@ void LcdDisplay::SetHomeVisible(bool visible) {
         if (emoji_box_ != nullptr) {
             lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
         }
-        if (bottom_bar_ != nullptr) {
-            lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
-        }
+        // Leave bottom_bar_ visibility alone; SetChatMessage / SetHideSubtitle own it.
     }
 }
 
