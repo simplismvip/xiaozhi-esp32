@@ -824,6 +824,15 @@ void Application::HandleWakeWordDetectedEvent() {
         return;
     }
 
+#if CONFIG_USE_MUSIC_PLAYER
+    {
+        auto* music = Board::GetInstance().GetMusic();
+        if (music && music->IsPlaying()) {
+            music->StopStreaming();
+        }
+    }
+#endif
+
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);

@@ -358,6 +358,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_MIXGO_NOVA
         bool "MixGo Nova (元控·青春)"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_MY_VOICE_BOARD
+        bool "My Voice Board (ESP32-S3 N16R8 + INMP441 + MAX98357A + ST7789/OLED)"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_MOVECALL_CUICAN_ESP32S3
         bool "Movecall CuiCan (璀璨 AI 吊坠)"
         depends on IDF_TARGET_ESP32S3
@@ -706,8 +709,21 @@ choice WK_ESP32S3_DEV_DISPLAY_TYPE
 
 endchoice
 
+choice MY_VOICE_DISPLAY_BUS
+    depends on BOARD_TYPE_MY_VOICE_BOARD
+    prompt "my-voice-board Display"
+    default MY_VOICE_DISPLAY_SPI_LCD
+    help
+        OLED for breadboard SSD1306; SPI LCD for the carrier 8-pin ST7789 panel.
+
+    config MY_VOICE_DISPLAY_OLED
+        bool "I2C OLED (SSD1306 / SH1106)"
+    config MY_VOICE_DISPLAY_SPI_LCD
+        bool "SPI LCD (ST7789 240x320)"
+endchoice
+
 choice DISPLAY_OLED_TYPE
-    depends on BOARD_TYPE_BREAD_COMPACT_WIFI || BOARD_TYPE_BREAD_COMPACT_ML307 || BOARD_TYPE_BREAD_COMPACT_NT26 || BOARD_TYPE_BREAD_COMPACT_ESP32 || BOARD_TYPE_HU_087 || (BOARD_TYPE_WK_ESP32S3_DEV && WK_ESP32S3_DEV_DISPLAY_OLED)
+    depends on BOARD_TYPE_BREAD_COMPACT_WIFI || BOARD_TYPE_BREAD_COMPACT_ML307 || BOARD_TYPE_BREAD_COMPACT_NT26 || BOARD_TYPE_BREAD_COMPACT_ESP32 || BOARD_TYPE_HU_087 || (BOARD_TYPE_WK_ESP32S3_DEV && WK_ESP32S3_DEV_DISPLAY_OLED) || (BOARD_TYPE_MY_VOICE_BOARD && MY_VOICE_DISPLAY_OLED)
     prompt "OLED Type"
     default OLED_SSD1306_128X32
     help
@@ -720,6 +736,19 @@ choice DISPLAY_OLED_TYPE
         bool "SH1106 128*64"
 endchoice
 
+
+choice MY_VOICE_LCD_TYPE
+    depends on BOARD_TYPE_MY_VOICE_BOARD && MY_VOICE_DISPLAY_SPI_LCD
+    prompt "ST7789 variant"
+    default MY_VOICE_LCD_ST7789_240X320
+    help
+        IPS: landscape 320x240 with XY swap + invert. Non-IPS: portrait 240x320.
+
+    config MY_VOICE_LCD_ST7789_240X320
+        bool "ST7789 240*320 IPS"
+    config MY_VOICE_LCD_ST7789_240X320_NO_IPS
+        bool "ST7789 240*320 Non-IPS"
+endchoice
 
 choice DISPLAY_LCD_TYPE
     depends on BOARD_TYPE_BREAD_COMPACT_WIFI_LCD || BOARD_TYPE_BREAD_COMPACT_ESP32_LCD || BOARD_TYPE_WDMOMO_CGC || BOARD_TYPE_BREAD_COMPACT_WIFI_CAM || (BOARD_TYPE_WK_ESP32S3_DEV && WK_ESP32S3_DEV_DISPLAY_LCD)
@@ -985,6 +1014,24 @@ menu "WiFi Configuration Method"
         help
             Use the PSA Crypto based BluFi security protocol adopted by ESP-IDF 6.
             The provisioning client must support ffdhe3072, SHA-256, and AES-CTR.
+endmenu
+
+menu "Music Gener Player"
+    depends on IDF_TARGET_ESP32S3
+
+    config USE_MUSIC_PLAYER
+        bool "Enable on-device music_gener HTTP streaming player"
+        default y
+        help
+            Device MCP self.music.play_song / stop. ESP32 resolves tracks via
+            music_gener and streams MP3 over HTTP (Helix decoder).
+
+    config MUSIC_GENER_BASE_URL
+        string "music_gener API base URL (no trailing slash)"
+        default "http://192.168.1.8:3020"
+        depends on USE_MUSIC_PLAYER
+        help
+            LAN URL reachable from the ESP32, e.g. http://192.168.1.8:3020
 endmenu
 
 config AUDIO_DEBUG_UDP_SERVER
