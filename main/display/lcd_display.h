@@ -33,6 +33,16 @@ protected:
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
 
+    lv_obj_t* home_panel_ = nullptr;
+    lv_obj_t* home_time_label_ = nullptr;
+    lv_obj_t* home_date_label_ = nullptr;
+    lv_obj_t* home_weather_icon_ = nullptr;
+    lv_obj_t* home_weather_label_ = nullptr;
+    lv_obj_t* home_temp_label_ = nullptr;
+    lv_obj_t* home_humidity_label_ = nullptr;
+    lv_obj_t* home_wake_hint_label_ = nullptr;
+    bool home_visible_ = false;
+
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
@@ -51,6 +61,11 @@ public:
     virtual void SetupUI() override;
     // Add theme switching function
     virtual void SetTheme(Theme* theme) override;
+
+    virtual void SetHomeVisible(bool visible) override;
+    virtual void SetHomeEnvironment(const char* weather_text, const char* temp_text,
+                                    const char* humidity_text) override;
+    virtual void SetHomeClock(const char* time_text, const char* date_text) override;
 
     // Set whether to hide chat messages/subtitles
     void SetHideSubtitle(bool hide);
