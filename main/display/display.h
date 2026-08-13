@@ -44,6 +44,21 @@ public:
     virtual Theme* GetTheme() { return current_theme_; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
+
+    // Idle home panel (clock / weather / environment). No-ops without LVGL home UI.
+    virtual void SetHomeVisible(bool visible) { (void)visible; }
+    virtual void SetHomeEnvironment(const char* weather_text,
+                                    const char* temp_text,
+                                    const char* humidity_text) {
+        (void)weather_text;
+        (void)temp_text;
+        (void)humidity_text;
+    }
+    virtual void SetHomeClock(const char* time_text, const char* date_text) {
+        (void)time_text;
+        (void)date_text;
+    }
+
     virtual bool AddTextGlyphs(const std::vector<TextGlyph>& glyphs, uint8_t bpp) { return false; }
     virtual void ClearTextGlyphs() {}
     virtual void SetEmojiCollection(std::shared_ptr<EmojiCollection>) {}

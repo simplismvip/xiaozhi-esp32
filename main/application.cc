@@ -15,7 +15,9 @@
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <cJSON.h>
+#include <cstdio>
 #include <cstring>
+#include <ctime>
 
 #define TAG "Application"
 
@@ -46,6 +48,11 @@ Application::Application() {
 }
 
 Application::~Application() {
+    if (idle_dim_timer_ != nullptr) {
+        esp_timer_stop(idle_dim_timer_);
+        esp_timer_delete(idle_dim_timer_);
+        idle_dim_timer_ = nullptr;
+    }
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
@@ -261,6 +268,9 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+            if (GetDeviceState() == kDeviceStateIdle) {
+                UpdateHomeClock();
+            }
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
@@ -824,6 +834,15 @@ void Application::HandleWakeWordDetectedEvent() {
         return;
     }
 
+#if CONFIG_USE_MUSIC_PLAYER
+    {
+        auto* music = Board::GetInstance().GetMusic();
+        if (music && music->IsPlaying()) {
+            music->StopStreaming();
+        }
+    }
+#endif
+
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
@@ -914,6 +933,68 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
 #endif
 }
 
+void Application::UpdateHomeClock() {
+    time_t now = time(nullptr);
+    struct tm timeinfo = {};
+    localtime_r(&now, &timeinfo);
+    char time_buf[16];
+    char date_buf[48];
+    if (timeinfo.tm_year > (2016 - 1900)) {
+        strftime(time_buf, sizeof(time_buf), "%H:%M", &timeinfo);
+        static const char* kWeek[] = {"日", "一", "二", "三", "四", "五", "六"};
+        snprintf(date_buf, sizeof(date_buf), "%d月%d日 周%s", timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                 kWeek[timeinfo.tm_wday]);
+    } else {
+        snprintf(time_buf, sizeof(time_buf), "--:--");
+        snprintf(date_buf, sizeof(date_buf), "----");
+    }
+    Board::GetInstance().GetDisplay()->SetHomeClock(time_buf, date_buf);
+}
+
+void Application::SetHomeMode(bool home_visible) {
+    auto display = Board::GetInstance().GetDisplay();
+    display->SetHomeVisible(home_visible);
+    if (home_visible) {
+        display->SetHomeEnvironment("--", "--°C", "湿度 --%");
+        UpdateHomeClock();
+    }
+}
+
+void Application::StartIdleDimTimer() {
+    CancelIdleDimTimer();
+    esp_timer_create_args_t args = {
+        .callback =
+            [](void* arg) {
+                auto* app = static_cast<Application*>(arg);
+                app->Schedule([app]() { app->OnIdleDimTimer(); });
+            },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "idle_dim",
+        .skip_unhandled_events = true,
+    };
+    if (idle_dim_timer_ == nullptr) {
+        ESP_ERROR_CHECK(esp_timer_create(&args, &idle_dim_timer_));
+    }
+    ESP_ERROR_CHECK(esp_timer_start_once(idle_dim_timer_, 30 * 1000 * 1000ULL));
+}
+
+void Application::CancelIdleDimTimer() {
+    if (idle_dim_timer_ && esp_timer_is_active(idle_dim_timer_)) {
+        esp_timer_stop(idle_dim_timer_);
+    }
+}
+
+void Application::OnIdleDimTimer() {
+    if (GetDeviceState() != kDeviceStateIdle) {
+        return;
+    }
+    auto* bl = Board::GetInstance().GetBacklight();
+    if (bl) {
+        bl->SetBrightness(20, false);
+    }
+}
+
 void Application::HandleStateChangedEvent() {
     DeviceState new_state = state_machine_.GetState();
     clock_ticks_ = 0;
@@ -926,12 +1007,22 @@ void Application::HandleStateChangedEvent() {
     auto led = board.GetLed();
     led->OnStateChanged();
 
+    if (new_state != kDeviceStateIdle && new_state != kDeviceStateUnknown) {
+        CancelIdleDimTimer();
+        if (auto* bl = board.GetBacklight()) {
+            bl->RestoreBrightness();
+        }
+        SetHomeMode(false);
+    }
+
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
             display->ClearChatMessages();    // Clear messages first
             display->SetEmotion("neutral");  // Then set emotion (wechat mode checks child count)
+            SetHomeMode(true);
+            StartIdleDimTimer();
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
             break;
