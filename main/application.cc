@@ -11,6 +11,10 @@
 #include "text_glyph_payload.h"
 #include "websocket_protocol.h"
 
+#if CONFIG_USE_ALARM
+#include "alarm_manager.h"
+#endif
+
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
@@ -271,6 +275,29 @@ void Application::Run() {
             if (GetDeviceState() == kDeviceStateIdle) {
                 UpdateHomeClock();
             }
+
+#if CONFIG_USE_ALARM
+            {
+                static bool alarm_sound_played = false;
+                auto* alarm_mgr = AlarmManager::GetInstance();
+                if (alarm_mgr->IsRing()) {
+                    if (!alarm_sound_played) {
+                        const char* name = alarm_mgr->GetCurrentAlarmName();
+                        std::string message = "闹钟时间到";
+                        if (name && name[0] != '\0') {
+                            message.append("：");
+                            message.append(name);
+                        }
+                        Alert(Lang::Strings::STANDBY, message.c_str(), "bell",
+                              Lang::Sounds::OGG_EXCLAMATION);
+                        alarm_sound_played = true;
+                        ESP_LOGI(TAG, "Alarm ringing: %s", message.c_str());
+                    }
+                } else {
+                    alarm_sound_played = false;
+                }
+            }
+#endif
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
@@ -834,6 +861,16 @@ void Application::HandleWakeWordDetectedEvent() {
         return;
     }
 
+#if CONFIG_USE_ALARM
+    {
+        auto* alarm_mgr = AlarmManager::GetInstance();
+        if (alarm_mgr->IsRing()) {
+            alarm_mgr->StopRing();
+            DismissAlert();
+        }
+    }
+#endif
+
 #if CONFIG_USE_MUSIC_PLAYER
     {
         auto* music = Board::GetInstance().GetMusic();
@@ -1231,6 +1268,12 @@ bool Application::CanEnterSleepMode() {
     if (!audio_service_.IsIdle()) {
         return false;
     }
+
+#if CONFIG_USE_ALARM
+    if (AlarmManager::GetInstance()->GetActiveAlarmCount() > 0) {
+        return false;
+    }
+#endif
 
     // Now it is safe to enter sleep mode
     return true;

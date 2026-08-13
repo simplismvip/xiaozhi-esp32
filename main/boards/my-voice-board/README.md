@@ -100,3 +100,13 @@ MAX98357A. No firmware changes required.
 
 See [`bluetooth-speaker.md`](./bluetooth-speaker.md) for the wiring guide,
 BOM, and troubleshooting.
+
+## Device alarms (MCP)
+
+With `CONFIG_USE_ALARM` (default on), the device exposes:
+
+- `self.alarm.set` — countdown (`delay` seconds) or wall clock (`hour`+`minute`)
+- `self.alarm.queryall` — list active alarms
+- `self.alarm.del` — delete by `id` or name keyword
+
+Timing runs on the ESP32 (NVS + `esp_timer`). Example phrases: “一分钟后叫我”, “早上七点闹钟”. Phase 1 is one-shot only; on fire the board plays a local alert sound (wake word dismisses it).

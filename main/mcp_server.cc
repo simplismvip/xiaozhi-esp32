@@ -11,12 +11,16 @@
 #include <esp_pthread.h>
 
 #include "application.h"
-#include "display.h"
-#include "oled_display.h"
 #include "board.h"
 #include "settings.h"
+#include "display.h"
+#include "oled_display.h"
 #include "lvgl_theme.h"
 #include "lvgl_display.h"
+
+#if CONFIG_USE_ALARM
+#include "alarm_manager.h"
+#endif
 
 #define TAG "MCP"
 
@@ -62,6 +66,53 @@ void McpServer::AddCommonTools() {
             codec->SetOutputVolume(properties["volume"].value<int>());
             return true;
         });
+
+#if CONFIG_USE_ALARM
+    // Ensure manager is constructed early so NVS alarms are restored.
+    AlarmManager::GetInstance();
+
+    AddTool(
+        "self.alarm.set",
+        "Set a one-shot alarm or countdown timer on the device.\n"
+        "Use this tool when the user asks to be reminded or woken later.\n"
+        "For relative timers (e.g. 10 minutes later), set delay in seconds.\n"
+        "For clock times (e.g. 7:00), set hour and minute (0-23 / 0-59).\n"
+        "Prefer hour+minute for wall-clock times; do not use Home Assistant for alarms.\n"
+        "Phase 1 supports one-shot only (repeat/interval are ignored).",
+        PropertyList({Property("delay", kPropertyTypeInteger, -1), Property("hour", kPropertyTypeInteger, -1),
+                      Property("minute", kPropertyTypeInteger, -1), Property("repeat", kPropertyTypeInteger, 1),
+                      Property("interval", kPropertyTypeInteger, 0), Property("name", kPropertyTypeString, "")}),
+        [](const PropertyList& properties) -> ReturnValue {
+            bool ok = AlarmManager::GetInstance()->SetAlarm(
+                properties["delay"].value<int>(), properties["hour"].value<int>(), properties["minute"].value<int>(),
+                properties["repeat"].value<int>(), properties["interval"].value<int>(),
+                properties["name"].value<std::string>());
+            return ok ? "{\"success\":true,\"message\":\"闹钟已设置\"}"
+                      : "{\"success\":false,\"message\":\"设置失败，请检查时间参数或闹钟数量\"}";
+        });
+
+    AddTool(
+        "self.alarm.del",
+        "Delete a previously set alarm.\n"
+        "Provide id from self.alarm.queryall, or a keyword matching the alarm name.",
+        PropertyList({Property("id", kPropertyTypeInteger, -1), Property("keyword", kPropertyTypeString, "")}),
+        [](const PropertyList& properties) -> ReturnValue {
+            int id = properties["id"].value<int>();
+            std::string keyword = properties["keyword"].value<std::string>();
+            bool ok = false;
+            if (id >= 0) {
+                ok = AlarmManager::GetInstance()->DeleteAlarmById(id);
+            } else if (!keyword.empty()) {
+                ok = AlarmManager::GetInstance()->DeleteAlarmByKeyword(keyword);
+            }
+            return ok ? "{\"success\":true,\"message\":\"闹钟已删除\"}"
+                      : "{\"success\":false,\"message\":\"未找到闹钟\"}";
+        });
+
+    AddTool("self.alarm.queryall",
+            "List all active device alarms/timers. Use when the user asks what alarms exist.", PropertyList(),
+            [](const PropertyList&) -> ReturnValue { return AlarmManager::GetInstance()->QueryAllAlarmsJson(); });
+#endif
     
     auto backlight = board.GetBacklight();
     if (backlight) {
