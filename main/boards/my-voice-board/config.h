@@ -39,11 +39,11 @@
 
 #define LCD_TYPE_ST7789_SERIAL
 #if CONFIG_MY_VOICE_LCD_ST7789_240X320
-#define DISPLAY_WIDTH   320
-#define DISPLAY_HEIGHT  240
-#define DISPLAY_MIRROR_X true
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
 #define DISPLAY_MIRROR_Y false
-#define DISPLAY_SWAP_XY true
+#define DISPLAY_SWAP_XY false
 #define DISPLAY_INVERT_COLOR    true
 #else
 #define DISPLAY_WIDTH   240

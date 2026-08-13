@@ -7,7 +7,7 @@ Custom voice assistant board for xiaozhi-esp32.
 - **MCU**: ESP32-S3 N16R8 (16MB Flash, 8MB PSRAM)
 - **Microphone**: INMP441 (I2S, full-duplex disabled, simplex mode)
 - **Speaker**: MAX98357A (I2S DAC + amplifier)
-- **Display (default)**: SPI ST7789 240×320 on the carrier board (8-pin: GND VCC SCL SDA RST DC CS BLK)
+- **Display (default)**: SPI ST7789 **portrait 240×320** on the carrier board (8-pin: GND VCC SCL SDA RST DC CS BLK)
 - **Emotions (SPI LCD)**: `noto-color-emoji_32` assets (official fonts package)
 - **Display (optional)**: I2C OLED (SSD1306 / SH1106) for breadboard prototyping
 - **LED**: Single LED on GPIO 48 (status indicator)
@@ -37,11 +37,11 @@ Custom voice assistant board for xiaozhi-esp32.
 | CS | GPIO 41 | |
 | Backlight (BLK) | GPIO 42 | |
 
-Panel: **ST7789 240×320** (e.g. 2.0" GMT020-02-8P).
+Panel: **ST7789 portrait 240×320** (e.g. 2.0" GMT020-02-8P). The SPI UI uses portrait orientation (240 px wide × 320 px tall).
 
 Carrier header order (left → right): `GND VCC SCL SDA RST DC CS BLK`.
 
-If colors/orientation look wrong, try **Non-IPS** in menuconfig (portrait 240×320 without invert/swap).
+If colors/orientation look wrong, try **Non-IPS** in menuconfig (portrait 240×320 without color invert). If the panel appears rotated or mirrored after flash, adjust `DISPLAY_SWAP_XY` / `DISPLAY_MIRROR_*` in `config.h` only — do not change idle UI layout code.
 
 ### Buttons (carrier board)
 
@@ -79,11 +79,11 @@ idf.py build
 idf.py -p /dev/cu.usbserial-XXXX flash monitor
 ```
 
-## Idle home UI
+## Idle home UI (portrait 240×320)
 
 - Top bar: Wi-Fi + battery (existing)
-- Idle: weather / temp / humidity placeholders (`--`, `--°C`, `--%`)
-- Chat: home panel hidden; emotion GIF shown
+- **Idle**: home panel with clock and weather placeholders (temp / humidity shown as `--`, `--°C`, `--%`)
+- **Chat**: home panel hidden; emotion emoji/GIF shown
 - Backlight: 30s after entering idle → 20%; wake/talk restores saved brightness
 
 ## LED Status
