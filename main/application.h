@@ -178,6 +178,13 @@ private:
     
     // State change handler called by state machine
     void OnStateChanged(DeviceState old_state, DeviceState new_state);
+
+    esp_timer_handle_t idle_dim_timer_ = nullptr;
+    void StartIdleDimTimer();
+    void CancelIdleDimTimer();
+    void OnIdleDimTimer();
+    void UpdateHomeClock();
+    void SetHomeMode(bool home_visible);
 };
 
 
