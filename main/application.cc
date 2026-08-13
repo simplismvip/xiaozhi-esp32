@@ -1007,6 +1007,14 @@ void Application::HandleStateChangedEvent() {
     auto led = board.GetLed();
     led->OnStateChanged();
 
+    if (new_state != kDeviceStateIdle && new_state != kDeviceStateUnknown) {
+        CancelIdleDimTimer();
+        if (auto* bl = board.GetBacklight()) {
+            bl->RestoreBrightness();
+        }
+        SetHomeMode(false);
+    }
+
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
@@ -1019,21 +1027,11 @@ void Application::HandleStateChangedEvent() {
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:
-            CancelIdleDimTimer();
-            if (auto* bl = board.GetBacklight()) {
-                bl->RestoreBrightness();
-            }
-            SetHomeMode(false);
             display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
-            CancelIdleDimTimer();
-            if (auto* bl = board.GetBacklight()) {
-                bl->RestoreBrightness();
-            }
-            SetHomeMode(false);
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
 
@@ -1053,11 +1051,6 @@ void Application::HandleStateChangedEvent() {
             }
             break;
         case kDeviceStateSpeaking:
-            CancelIdleDimTimer();
-            if (auto* bl = board.GetBacklight()) {
-                bl->RestoreBrightness();
-            }
-            SetHomeMode(false);
             display->SetStatus(Lang::Strings::SPEAKING);
 
             if (listening_mode_ != kListeningModeRealtime) {
@@ -1068,11 +1061,6 @@ void Application::HandleStateChangedEvent() {
             audio_service_.ResetDecoder();
             break;
         case kDeviceStateWifiConfiguring:
-            CancelIdleDimTimer();
-            if (auto* bl = board.GetBacklight()) {
-                bl->RestoreBrightness();
-            }
-            SetHomeMode(false);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
             break;
