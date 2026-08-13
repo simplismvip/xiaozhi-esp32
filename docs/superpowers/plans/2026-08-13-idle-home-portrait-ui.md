@@ -215,7 +215,9 @@ After `top_bar_` / `status_bar_` creation (and before bottom chat bar setup), cr
     home_weather_icon_ = lv_label_create(env_row);
     lv_obj_set_style_text_font(home_weather_icon_, large_icon_font, 0);
     lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(home_weather_icon_, MATERIAL_SYMBOLS_WB_SUNNY);  // if symbol missing, use "☀" or ROBOT placeholder
+    // No dedicated sunny glyph in tree; use a large icon font symbol or UTF-8 "晴"/sun.
+    // Prefer grepping MATERIAL_SYMBOLS_* for a weather-like icon; fallback:
+    lv_label_set_text(home_weather_icon_, "☀");
 
     lv_obj_t* env_col = lv_obj_create(env_row);
     lv_obj_set_size(env_col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -356,8 +358,6 @@ void Application::SetHomeMode(bool home_visible) {
     auto display = Board::GetInstance().GetDisplay();
     display->SetHomeVisible(home_visible);
     if (home_visible) {
-        display->SetHomeEnvironment("--", "--°C", "湿度 --%", /* ignored */);
-        // Fix: SetHomeEnvironment has 3 string args only
         display->SetHomeEnvironment("--", "--°C", "湿度 --%");
         UpdateHomeClock();
     }
