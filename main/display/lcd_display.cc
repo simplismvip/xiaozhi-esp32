@@ -1014,9 +1014,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(env_row, LV_SCROLLBAR_MODE_OFF);
 
     home_weather_icon_ = lv_label_create(env_row);
-    lv_obj_set_style_text_font(home_weather_icon_, large_icon_font, 0);
+    // Prefer text font for weather glyph; FA/material icon fonts often lack ☀ and
+    // falling through a dangling theme font fallback crashed LVGL after Assets::Apply.
+    lv_obj_set_style_text_font(home_weather_icon_, text_font, 0);
     lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(home_weather_icon_, "☀");
+    lv_label_set_text(home_weather_icon_, "晴");
 
     lv_obj_t* env_col = lv_obj_create(env_row);
     lv_obj_set_size(env_col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -1379,6 +1381,37 @@ void LcdDisplay::SetTheme(Theme* theme) {
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+
+    // Idle home labels keep raw lv_font_t* from SetupUI. After Assets::Apply replaces the
+    // theme text font, those pointers can dangle (LvglBuiltInFont stores a copy). Rebind here
+    // before the previous font owner is destroyed in LvglDisplay::SetTextFont.
+    if (home_date_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_date_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_date_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_weather_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_weather_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_weather_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_temp_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_temp_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_humidity_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_humidity_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_wake_hint_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_wake_hint_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_time_label_ != nullptr) {
+        lv_obj_set_style_text_color(home_time_label_, lvgl_theme->text_color(), 0);
+    }
+    if (home_weather_icon_ != nullptr) {
+        lv_obj_set_style_text_font(home_weather_icon_, text_font, 0);
+        lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
+    }
 
     // If we have the chat message style, update all message bubbles
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
