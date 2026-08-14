@@ -955,7 +955,7 @@ void Application::SetHomeMode(bool home_visible) {
     auto display = Board::GetInstance().GetDisplay();
     display->SetHomeVisible(home_visible);
     if (home_visible) {
-        display->SetHomeEnvironment("--", "--°C", "湿度 --%");
+        display->SetHomeEnvironment("晴", "0°C", "湿度 0%");
         UpdateHomeClock();
     }
 }

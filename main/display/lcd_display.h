@@ -62,6 +62,7 @@ public:
     virtual void SetTheme(Theme* theme) override;
 
     virtual void SetHomeVisible(bool visible) override;
+    virtual bool IsHomeVisible() const override { return home_visible_; }
     virtual void SetHomeEnvironment(const char* weather_text, const char* temp_text,
                                     const char* humidity_text) override;
     virtual void SetHomeClock(const char* time_text, const char* date_text) override;
