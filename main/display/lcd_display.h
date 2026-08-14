@@ -36,7 +36,6 @@ protected:
     lv_obj_t* home_panel_ = nullptr;
     lv_obj_t* home_time_label_ = nullptr;
     lv_obj_t* home_date_label_ = nullptr;
-    lv_obj_t* home_weather_icon_ = nullptr;
     lv_obj_t* home_weather_label_ = nullptr;
     lv_obj_t* home_temp_label_ = nullptr;
     lv_obj_t* home_humidity_label_ = nullptr;

@@ -324,7 +324,6 @@ LcdDisplay::~LcdDisplay() {
         home_panel_ = nullptr;
         home_time_label_ = nullptr;
         home_date_label_ = nullptr;
-        home_weather_icon_ = nullptr;
         home_weather_label_ = nullptr;
         home_temp_label_ = nullptr;
         home_humidity_label_ = nullptr;
@@ -963,7 +962,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(home_panel_, 0, 0);
     lv_obj_set_style_pad_top(home_panel_, 36, 0);  // clear status bar
     lv_obj_set_style_pad_bottom(home_panel_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_style_pad_hor(home_panel_, lvgl_theme->spacing(4), 0);
+    lv_obj_set_style_pad_hor(home_panel_, 20, 0);
     lv_obj_set_flex_flow(home_panel_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(home_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
@@ -1000,44 +999,47 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_color(rule, lvgl_theme->text_color(), 0);
     lv_obj_set_style_border_width(rule, 0, 0);
 
-    // --- weather row ---
-    lv_obj_t* env_row = lv_obj_create(home_panel_);
-    lv_obj_set_width(env_row, LV_PCT(100));
-    lv_obj_set_height(env_row, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(env_row, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(env_row, 0, 0);
-    lv_obj_set_style_pad_all(env_row, 0, 0);
-    lv_obj_set_flex_flow(env_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(env_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(env_row, lvgl_theme->spacing(4), 0);
-    lv_obj_set_scrollbar_mode(env_row, LV_SCROLLBAR_MODE_OFF);
-
-    home_weather_icon_ = lv_label_create(env_row);
-    // Prefer text font for weather glyph; FA/material icon fonts often lack ☀ and
-    // falling through a dangling theme font fallback crashed LVGL after Assets::Apply.
-    lv_obj_set_style_text_font(home_weather_icon_, text_font, 0);
-    lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(home_weather_icon_, "晴");
-
-    lv_obj_t* env_col = lv_obj_create(env_row);
-    lv_obj_set_size(env_col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    // --- environment block (left-aligned; weather+temp one line, humidity next) ---
+    lv_obj_t* env_col = lv_obj_create(home_panel_);
+    lv_obj_set_width(env_col, LV_PCT(100));
+    lv_obj_set_height(env_col, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(env_col, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(env_col, 0, 0);
-    lv_obj_set_flex_flow(env_col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(env_col, 0, 0);
+    lv_obj_set_flex_flow(env_col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(env_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(env_col, lvgl_theme->spacing(2), 0);
     lv_obj_set_scrollbar_mode(env_col, LV_SCROLLBAR_MODE_OFF);
 
-    home_weather_label_ = lv_label_create(env_col);
+    lv_obj_t* weather_temp_row = lv_obj_create(env_col);
+    lv_obj_set_width(weather_temp_row, LV_PCT(100));
+    lv_obj_set_height(weather_temp_row, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(weather_temp_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(weather_temp_row, 0, 0);
+    lv_obj_set_style_pad_all(weather_temp_row, 0, 0);
+    lv_obj_set_flex_flow(weather_temp_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(weather_temp_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(weather_temp_row, lvgl_theme->spacing(2), 0);
+    lv_obj_set_scrollbar_mode(weather_temp_row, LV_SCROLLBAR_MODE_OFF);
+
+    home_weather_label_ = lv_label_create(weather_temp_row);
+    lv_obj_set_style_text_font(home_weather_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_weather_label_, lv_color_hex(0x7DD3FC), 0);
     lv_label_set_text(home_weather_label_, "--");
-    home_temp_label_ = lv_label_create(env_col);
+
+    home_temp_label_ = lv_label_create(weather_temp_row);
+    lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_temp_label_, lv_color_hex(0xFBBF24), 0);
     lv_label_set_text(home_temp_label_, "--°C");
+
     home_humidity_label_ = lv_label_create(env_col);
+    lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_humidity_label_, lv_color_hex(0x86EFAC), 0);
     lv_label_set_text(home_humidity_label_, "湿度 --%");
-    for (lv_obj_t* lab : {home_weather_label_, home_temp_label_, home_humidity_label_}) {
-        lv_obj_set_style_text_font(lab, text_font, 0);
-        lv_obj_set_style_text_color(lab, lvgl_theme->text_color(), 0);
-    }
+
+    // Intentionally no home_weather_icon_; future metrics (e.g. pressure) = new labels under
+    // humidity.
 
     home_wake_hint_label_ = lv_label_create(home_panel_);
     lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
@@ -1391,15 +1393,15 @@ void LcdDisplay::SetTheme(Theme* theme) {
     }
     if (home_weather_label_ != nullptr) {
         lv_obj_set_style_text_font(home_weather_label_, text_font, 0);
-        lv_obj_set_style_text_color(home_weather_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_text_color(home_weather_label_, lv_color_hex(0x7DD3FC), 0);
     }
     if (home_temp_label_ != nullptr) {
         lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
-        lv_obj_set_style_text_color(home_temp_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_text_color(home_temp_label_, lv_color_hex(0xFBBF24), 0);
     }
     if (home_humidity_label_ != nullptr) {
         lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
-        lv_obj_set_style_text_color(home_humidity_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_text_color(home_humidity_label_, lv_color_hex(0x86EFAC), 0);
     }
     if (home_wake_hint_label_ != nullptr) {
         lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
@@ -1407,10 +1409,6 @@ void LcdDisplay::SetTheme(Theme* theme) {
     }
     if (home_time_label_ != nullptr) {
         lv_obj_set_style_text_color(home_time_label_, lvgl_theme->text_color(), 0);
-    }
-    if (home_weather_icon_ != nullptr) {
-        lv_obj_set_style_text_font(home_weather_icon_, text_font, 0);
-        lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
     }
 
     // If we have the chat message style, update all message bubbles
