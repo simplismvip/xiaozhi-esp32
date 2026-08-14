@@ -87,6 +87,12 @@ idf.py -p /dev/cu.usbserial-XXXX flash monitor
 - Backlight: 30s after entering idle → 20% (not written to NVS); leave idle restores saved brightness
 - Live weather/TH: later via `Display::SetHomeEnvironment(...)` (custom HTTP); phase 1 is placeholders only
 
+Idle home appearance (2026-08-14):
+- Default theme is `dark` when NVS has no saved theme.
+- Environment block: left-aligned, 20px side inset; line 1 weather + temp; line 2 humidity (future metrics one per line).
+- Status bar and wake hint unchanged.
+
+
 ## LED Status
 
 See `main/led/single_led.cc::OnStateChanged()` for state → LED mode mapping (built-in).
