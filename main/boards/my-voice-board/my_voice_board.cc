@@ -1,33 +1,33 @@
-#include "wifi_board.h"
 #include "codecs/no_audio_codec.h"
 #include "display/display.h"
+#include "wifi_board.h"
 #if CONFIG_MY_VOICE_DISPLAY_SPI_LCD
-#include "display/lcd_display.h"
-#include "backlight.h"
 #include <driver/spi_common.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
+#include "backlight.h"
+#include "my_voice_lcd_display.h"
 #else
-#include "display/oled_display.h"
 #include <driver/i2c_master.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
+#include "display/oled_display.h"
 #ifdef SH1106
 #include <esp_lcd_panel_sh1106.h>
 #endif
 #endif
-#include "system_reset.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
 #include "led/single_led.h"
+#include "system_reset.h"
 #if CONFIG_USE_MUSIC_PLAYER
 #include "esp32_music.h"
 #include "mcp_server.h"
 #endif
-#include <wifi_manager.h>
 #include <esp_log.h>
+#include <wifi_manager.h>
 #include <algorithm>
 #include <string>
 
@@ -93,8 +93,7 @@ private:
             return;
         }
 
-        if (esp_lcd_panel_reset(panel) != ESP_OK ||
-            esp_lcd_panel_init(panel) != ESP_OK ||
+        if (esp_lcd_panel_reset(panel) != ESP_OK || esp_lcd_panel_init(panel) != ESP_OK ||
             esp_lcd_panel_invert_color(panel, DISPLAY_INVERT_COLOR) != ESP_OK ||
             esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY) != ESP_OK ||
             esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y) != ESP_OK ||
@@ -106,9 +105,9 @@ private:
             return;
         }
 
-        display_ = new SpiLcdDisplay(panel_io, panel,
-            DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
-            DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+        display_ = new MyVoiceLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                                         DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
+                                         DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         ESP_LOGI(TAG, "ST7789 %dx%d ready", DISPLAY_WIDTH, DISPLAY_HEIGHT);
     }
 #else
@@ -121,9 +120,10 @@ private:
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
             .trans_queue_depth = 0,
-            .flags = {
-                .enable_internal_pullup = 1,
-            },
+            .flags =
+                {
+                    .enable_internal_pullup = 1,
+                },
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &display_i2c_bus_));
     }
@@ -159,10 +159,11 @@ private:
             .dc_bit_offset = 6,
             .lcd_cmd_bits = 8,
             .lcd_param_bits = 8,
-            .flags = {
-                .dc_low_on_data = 0,
-                .disable_control_phase = 0,
-            },
+            .flags =
+                {
+                    .dc_low_on_data = 0,
+                    .disable_control_phase = 0,
+                },
             // 100kHz is more tolerant of marginal Dupont / breadboard contacts
             .scl_speed_hz = 100 * 1000,
         };
@@ -215,7 +216,8 @@ private:
         }
 
         ESP_LOGI(TAG, "Turning display on");
-        display_ = new OledDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
+        display_ = new OledDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                                   DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
     }
 #endif
 
@@ -228,9 +230,7 @@ private:
             }
             app.ToggleChatState();
         });
-        boot_button_.OnLongPress([this]() {
-            EnterWifiConfigMode();
-        });
+        boot_button_.OnLongPress([this]() { EnterWifiConfigMode(); });
 
 #if CONFIG_MY_VOICE_DISPLAY_SPI_LCD
         volume_up_button_.OnClick([this]() {
@@ -255,7 +255,8 @@ private:
             return;
         }
         auto& mcp_server = McpServer::GetInstance();
-        mcp_server.AddTool("self.music.play_song",
+        mcp_server.AddTool(
+            "self.music.play_song",
             "播放指定的歌曲。用户要求播放音乐、点歌时必须使用此工具。\n"
             "参数:\n"
             "  song_name: 歌曲名称（必需）\n"
@@ -275,18 +276,16 @@ private:
                 return "{\"success\": true, \"message\": \"音乐开始播放\"}";
             });
 
-        mcp_server.AddTool("self.music.stop",
-            "停止当前音乐播放。用户说停止播放、关闭音乐时使用。",
-            PropertyList(),
-            [music](const PropertyList& properties) -> ReturnValue {
-                (void)properties;
-                music->StopStreaming();
-                return "{\"success\": true, \"message\": \"已停止播放\"}";
-            });
+        mcp_server.AddTool("self.music.stop", "停止当前音乐播放。用户说停止播放、关闭音乐时使用。",
+                           PropertyList(), [music](const PropertyList& properties) -> ReturnValue {
+                               (void)properties;
+                               music->StopStreaming();
+                               return "{\"success\": true, \"message\": \"已停止播放\"}";
+                           });
 
-        mcp_server.AddTool("self.music.pause",
-            "暂停当前音乐播放（保持进度，可继续）。用户说暂停、先停一下时使用。",
-            PropertyList(),
+        mcp_server.AddTool(
+            "self.music.pause",
+            "暂停当前音乐播放（保持进度，可继续）。用户说暂停、先停一下时使用。", PropertyList(),
             [music](const PropertyList& properties) -> ReturnValue {
                 (void)properties;
                 if (!music->Pause()) {
@@ -295,10 +294,10 @@ private:
                 return "{\"success\": true, \"message\": \"已暂停\"}";
             });
 
-        mcp_server.AddTool("self.music.resume",
+        mcp_server.AddTool(
+            "self.music.resume",
             "继续播放已暂停的音乐。用户说继续播放、接着放时使用。若未在播则应改用 play_song。",
-            PropertyList(),
-            [music](const PropertyList& properties) -> ReturnValue {
+            PropertyList(), [music](const PropertyList& properties) -> ReturnValue {
                 (void)properties;
                 if (!music->Resume()) {
                     return "{\"success\": false, \"message\": \"没有可继续的暂停音乐\"}";
@@ -307,35 +306,33 @@ private:
             });
 
         mcp_server.AddTool("self.music.next",
-            "切换到曲库公开列表中的下一首（按 id 顺序）。须已有当前播放曲目。",
-            PropertyList(),
-            [music](const PropertyList& properties) -> ReturnValue {
-                (void)properties;
-                if (!music->Next()) {
-                    return "{\"success\": false, \"message\": \"无法切换下一首\"}";
-                }
-                return "{\"success\": true, \"message\": \"已切换下一首\"}";
-            });
+                           "切换到曲库公开列表中的下一首（按 id 顺序）。须已有当前播放曲目。",
+                           PropertyList(), [music](const PropertyList& properties) -> ReturnValue {
+                               (void)properties;
+                               if (!music->Next()) {
+                                   return "{\"success\": false, \"message\": \"无法切换下一首\"}";
+                               }
+                               return "{\"success\": true, \"message\": \"已切换下一首\"}";
+                           });
 
         mcp_server.AddTool("self.music.prev",
-            "切换到曲库公开列表中的上一首（按 id 顺序）。须已有当前播放曲目。",
-            PropertyList(),
-            [music](const PropertyList& properties) -> ReturnValue {
-                (void)properties;
-                if (!music->Prev()) {
-                    return "{\"success\": false, \"message\": \"无法切换上一首\"}";
-                }
-                return "{\"success\": true, \"message\": \"已切换上一首\"}";
-            });
+                           "切换到曲库公开列表中的上一首（按 id 顺序）。须已有当前播放曲目。",
+                           PropertyList(), [music](const PropertyList& properties) -> ReturnValue {
+                               (void)properties;
+                               if (!music->Prev()) {
+                                   return "{\"success\": false, \"message\": \"无法切换上一首\"}";
+                               }
+                               return "{\"success\": true, \"message\": \"已切换上一首\"}";
+                           });
     }
 #endif
 
 public:
 #if CONFIG_MY_VOICE_DISPLAY_SPI_LCD
-    MyVoiceBoard() :
-        boot_button_(BOOT_BUTTON_GPIO),
-        volume_up_button_(VOLUME_UP_BUTTON_GPIO),
-        volume_down_button_(VOLUME_DOWN_BUTTON_GPIO) {
+    MyVoiceBoard()
+        : boot_button_(BOOT_BUTTON_GPIO),
+          volume_up_button_(VOLUME_UP_BUTTON_GPIO),
+          volume_down_button_(VOLUME_DOWN_BUTTON_GPIO) {
         InitializeSpi();
         InitializeSt7789Display();
         InitializeButtons();
@@ -363,16 +360,14 @@ public:
     }
 
     virtual AudioCodec* GetAudioCodec() override {
-        static NoAudioCodecSimplex audio_codec(
-            AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT,
-            AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
+        static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+                                               AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK,
+                                               AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK,
+                                               AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
         return &audio_codec;
     }
 
-    virtual Display* GetDisplay() override {
-        return display_;
-    }
+    virtual Display* GetDisplay() override { return display_; }
 
 #if CONFIG_MY_VOICE_DISPLAY_SPI_LCD
     virtual Backlight* GetBacklight() override {

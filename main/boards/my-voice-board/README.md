@@ -83,7 +83,8 @@ idf.py -p /dev/cu.usbserial-XXXX flash monitor
 
 - Top bar: Wi-Fi + battery (existing)
 - **Idle**: home panel with large clock, date, weather placeholders (`晴` / `0°C` / `湿度 0%`), and wake hint `说“小智”开始对话`
-- **Chat**: home panel hidden; emotion emoji/GIF + subtitles shown
+- **Chat**: home panel hidden; LVGL eye-emotion animator (not GIF) + subtitles shown
+- Eye emotions map the 21 standard names onto 5 base animations (blink/sleep/happy/sad/angry); see `docs/superpowers/specs/2026-08-14-eye-emotion-animator-design.md`
 - Backlight: 30s after entering idle → 20% (not written to NVS); leave idle restores saved brightness
 - Live weather/TH: later via `Display::SetHomeEnvironment(...)` (custom HTTP); phase 1 is placeholders only
 
