@@ -47,8 +47,8 @@ public:
 
     // Idle home panel (clock / weather / environment). No-ops without LVGL home UI.
     virtual void SetHomeVisible(bool visible) { (void)visible; }
-    virtual void SetHomeEnvironment(const char* weather_text,
-                                    const char* temp_text,
+    virtual bool IsHomeVisible() const { return false; }
+    virtual void SetHomeEnvironment(const char* weather_text, const char* temp_text,
                                     const char* humidity_text) {
         (void)weather_text;
         (void)temp_text;

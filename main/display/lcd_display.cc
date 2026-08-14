@@ -79,7 +79,7 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     // Load theme from settings
     Settings settings("display", false);
-    std::string theme_name = settings.GetString("theme", "light");
+    std::string theme_name = settings.GetString("theme", "dark");
     current_theme_ = LvglThemeManager::GetInstance().GetTheme(theme_name);
 
     // Create a timer to hide the preview image
@@ -324,7 +324,6 @@ LcdDisplay::~LcdDisplay() {
         home_panel_ = nullptr;
         home_time_label_ = nullptr;
         home_date_label_ = nullptr;
-        home_weather_icon_ = nullptr;
         home_weather_label_ = nullptr;
         home_temp_label_ = nullptr;
         home_humidity_label_ = nullptr;
@@ -961,17 +960,21 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_size(home_panel_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_bg_opa(home_panel_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(home_panel_, 0, 0);
-    lv_obj_set_style_pad_top(home_panel_, 36, 0);  // clear status bar
-    lv_obj_set_style_pad_bottom(home_panel_, lvgl_theme->spacing(4), 0);
-    lv_obj_set_style_pad_hor(home_panel_, lvgl_theme->spacing(4), 0);
+    // Status chrome ≈ icon line + vertical pads; keep 12px below it before the clock.
+    const int status_chrome_h = lvgl_theme->spacing(2) * 2 + 16;
+    lv_obj_set_style_pad_top(home_panel_, status_chrome_h + 12, 0);
+    lv_obj_set_style_pad_bottom(home_panel_, 6, 0);  // wake hint sits 6px above screen bottom
+    lv_obj_set_style_pad_hor(home_panel_, 30, 0);
+    // Top-down stack only — do NOT use SPACE_BETWEEN (it shrinks the clock block and clips humidity).
     lv_obj_set_flex_flow(home_panel_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(home_panel_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(home_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_align(home_panel_, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_HIDDEN);  // shown when idle
+    lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_clear_flag(home_panel_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(home_panel_, LV_SCROLLBAR_MODE_OFF);
 
-    // --- clock block ---
+    // --- clock + environment (single content column, never flex-shrunk) ---
     lv_obj_t* clock_col = lv_obj_create(home_panel_);
     lv_obj_set_width(clock_col, LV_PCT(100));
     lv_obj_set_height(clock_col, LV_SIZE_CONTENT);
@@ -979,18 +982,48 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(clock_col, 0, 0);
     lv_obj_set_style_pad_all(clock_col, 0, 0);
     lv_obj_set_flex_flow(clock_col, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(clock_col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(clock_col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_grow(clock_col, 0);
+    lv_obj_add_flag(clock_col, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_clear_flag(clock_col, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(clock_col, LV_SCROLLBAR_MODE_OFF);
 
-    home_time_label_ = lv_label_create(clock_col);
+    // Reserve layout height for scaled 30px clock (~1.4x → ~42px).
+    lv_obj_t* time_wrap = lv_obj_create(clock_col);
+    lv_obj_set_size(time_wrap, LV_PCT(100), 48);
+    lv_obj_set_style_bg_opa(time_wrap, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(time_wrap, 0, 0);
+    lv_obj_set_style_pad_all(time_wrap, 0, 0);
+    lv_obj_add_flag(time_wrap, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_clear_flag(time_wrap, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(time_wrap, LV_SCROLLBAR_MODE_OFF);
+
+    home_time_label_ = lv_label_create(time_wrap);
     lv_obj_set_style_text_font(home_time_label_, &font_noto_sans_basic_30_4, 0);
     lv_obj_set_style_text_color(home_time_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_transform_scale(home_time_label_, 358, 0);  // 358/256 ≈ 1.4x
+    lv_obj_set_style_transform_pivot_x(home_time_label_, LV_PCT(50), 0);
+    lv_obj_set_style_transform_pivot_y(home_time_label_, LV_PCT(50), 0);
+    lv_obj_align(home_time_label_, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(home_time_label_, "--:--");
 
-    home_date_label_ = lv_label_create(clock_col);
+    // Theme text_font keeps CJK; scale for visual size.
+    lv_obj_t* date_wrap = lv_obj_create(clock_col);
+    lv_obj_set_size(date_wrap, LV_PCT(100), 28);
+    lv_obj_set_style_bg_opa(date_wrap, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(date_wrap, 0, 0);
+    lv_obj_set_style_pad_all(date_wrap, 0, 0);
+    lv_obj_add_flag(date_wrap, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_clear_flag(date_wrap, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(date_wrap, LV_SCROLLBAR_MODE_OFF);
+
+    home_date_label_ = lv_label_create(date_wrap);
     lv_obj_set_style_text_font(home_date_label_, text_font, 0);
     lv_obj_set_style_text_color(home_date_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_transform_scale(home_date_label_, 320, 0);  // 320/256 = 1.25x
+    lv_obj_set_style_transform_pivot_x(home_date_label_, LV_PCT(50), 0);
+    lv_obj_set_style_transform_pivot_y(home_date_label_, LV_PCT(50), 0);
+    lv_obj_align(home_date_label_, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(home_date_label_, "----");
 
     lv_obj_t* rule = lv_obj_create(clock_col);
@@ -1000,49 +1033,67 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_color(rule, lvgl_theme->text_color(), 0);
     lv_obj_set_style_border_width(rule, 0, 0);
 
-    // --- weather row ---
-    lv_obj_t* env_row = lv_obj_create(home_panel_);
-    lv_obj_set_width(env_row, LV_PCT(100));
-    lv_obj_set_height(env_row, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(env_row, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(env_row, 0, 0);
-    lv_obj_set_style_pad_all(env_row, 0, 0);
-    lv_obj_set_flex_flow(env_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(env_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(env_row, lvgl_theme->spacing(4), 0);
-    lv_obj_set_scrollbar_mode(env_row, LV_SCROLLBAR_MODE_OFF);
-
-    home_weather_icon_ = lv_label_create(env_row);
-    lv_obj_set_style_text_font(home_weather_icon_, large_icon_font, 0);
-    lv_obj_set_style_text_color(home_weather_icon_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(home_weather_icon_, "☀");
-
-    lv_obj_t* env_col = lv_obj_create(env_row);
-    lv_obj_set_size(env_col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    // --- environment block (left-aligned; weather+temp one line, humidity next) ---
+    lv_obj_t* env_col = lv_obj_create(clock_col);
+    lv_obj_set_width(env_col, LV_PCT(100));
+    lv_obj_set_height(env_col, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(env_col, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(env_col, 0, 0);
+    lv_obj_set_style_pad_top(env_col, 10, 0);
+    lv_obj_set_style_pad_bottom(env_col, 4, 0);
+    lv_obj_set_style_pad_hor(env_col, 0, 0);
     lv_obj_set_flex_flow(env_col, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_all(env_col, 0, 0);
+    lv_obj_set_flex_align(env_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(env_col, lvgl_theme->spacing(3), 0);
+    lv_obj_set_flex_grow(env_col, 0);
+    lv_obj_add_flag(env_col, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_clear_flag(env_col, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(env_col, LV_SCROLLBAR_MODE_OFF);
 
-    home_weather_label_ = lv_label_create(env_col);
-    lv_label_set_text(home_weather_label_, "--");
-    home_temp_label_ = lv_label_create(env_col);
-    lv_label_set_text(home_temp_label_, "--°C");
+    lv_obj_t* weather_temp_row = lv_obj_create(env_col);
+    lv_obj_set_width(weather_temp_row, LV_PCT(100));
+    lv_obj_set_height(weather_temp_row, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(weather_temp_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(weather_temp_row, 0, 0);
+    lv_obj_set_style_pad_all(weather_temp_row, 0, 0);
+    lv_obj_set_flex_flow(weather_temp_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(weather_temp_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(weather_temp_row, lvgl_theme->spacing(2), 0);
+    lv_obj_clear_flag(weather_temp_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(weather_temp_row, LV_SCROLLBAR_MODE_OFF);
+
+    home_weather_label_ = lv_label_create(weather_temp_row);
+    lv_obj_set_style_text_font(home_weather_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_weather_label_, lv_color_hex(0x7DD3FC), 0);
+    lv_label_set_text(home_weather_label_, "晴");
+
+    home_temp_label_ = lv_label_create(weather_temp_row);
+    lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_temp_label_, lv_color_hex(0xFBBF24), 0);
+    lv_label_set_text(home_temp_label_, "0°C");
+
     home_humidity_label_ = lv_label_create(env_col);
-    lv_label_set_text(home_humidity_label_, "湿度 --%");
-    for (lv_obj_t* lab : {home_weather_label_, home_temp_label_, home_humidity_label_}) {
-        lv_obj_set_style_text_font(lab, text_font, 0);
-        lv_obj_set_style_text_color(lab, lvgl_theme->text_color(), 0);
-    }
+    lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
+    lv_obj_set_style_text_color(home_humidity_label_, lv_color_hex(0x86EFAC), 0);
+    lv_label_set_long_mode(home_humidity_label_, LV_LABEL_LONG_CLIP);
+    lv_label_set_text(home_humidity_label_, "湿度 0%");
 
+    // Intentionally no home_weather_icon_; future metrics (e.g. pressure) = new labels under
+    // humidity.
+
+    // Pin wake hint to the bottom so it never competes with humidity for vertical space.
     home_wake_hint_label_ = lv_label_create(home_panel_);
+    lv_obj_add_flag(home_wake_hint_label_, LV_OBJ_FLAG_FLOATING);  // ignore flex layout
     lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
-    lv_obj_set_style_text_color(home_wake_hint_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_opa(home_wake_hint_label_, LV_OPA_60, 0);
+    // Slightly smaller than body text; keep theme font for CJK.
+    lv_obj_set_style_transform_scale(home_wake_hint_label_, 204, 0);  // 204/256 ≈ 0.8x
+    lv_obj_set_style_transform_pivot_x(home_wake_hint_label_, LV_PCT(50), 0);
+    lv_obj_set_style_transform_pivot_y(home_wake_hint_label_, LV_PCT(100), 0);
+    lv_obj_set_style_text_color(home_wake_hint_label_, lv_color_hex(0x9CA3AF), 0);
+    lv_obj_set_style_text_opa(home_wake_hint_label_, LV_OPA_COVER, 0);
     lv_label_set_text(home_wake_hint_label_, "说“小智”开始对话");
-
+    lv_obj_align(home_wake_hint_label_, LV_ALIGN_BOTTOM_MID, 0, 0);
 #if CONFIG_USE_MULTILINE_CHAT_MESSAGE
     /* Bottom bar - auto height, grows upward with wrapped text */
     bottom_bar_ = lv_obj_create(screen);
@@ -1379,6 +1430,44 @@ void LcdDisplay::SetTheme(Theme* theme) {
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+
+    // Idle home labels keep raw lv_font_t* from SetupUI. After Assets::Apply replaces the
+    // theme text font, those pointers can dangle (LvglBuiltInFont stores a copy). Rebind here
+    // before the previous font owner is destroyed in LvglDisplay::SetTextFont.
+    if (home_date_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_date_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_date_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_transform_scale(home_date_label_, 320, 0);
+        lv_obj_set_style_transform_pivot_x(home_date_label_, LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(home_date_label_, LV_PCT(50), 0);
+    }
+    if (home_weather_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_weather_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_weather_label_, lv_color_hex(0x7DD3FC), 0);
+    }
+    if (home_temp_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_temp_label_, lv_color_hex(0xFBBF24), 0);
+    }
+    if (home_humidity_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
+        lv_obj_set_style_text_color(home_humidity_label_, lv_color_hex(0x86EFAC), 0);
+    }
+    if (home_wake_hint_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
+        lv_obj_set_style_transform_scale(home_wake_hint_label_, 204, 0);
+        lv_obj_set_style_transform_pivot_x(home_wake_hint_label_, LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(home_wake_hint_label_, LV_PCT(100), 0);
+        lv_obj_set_style_text_color(home_wake_hint_label_, lv_color_hex(0x9CA3AF), 0);
+        lv_obj_set_style_text_opa(home_wake_hint_label_, LV_OPA_COVER, 0);
+    }
+    if (home_time_label_ != nullptr) {
+        lv_obj_set_style_text_font(home_time_label_, &font_noto_sans_basic_30_4, 0);
+        lv_obj_set_style_text_color(home_time_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_transform_scale(home_time_label_, 358, 0);
+        lv_obj_set_style_transform_pivot_x(home_time_label_, LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(home_time_label_, LV_PCT(50), 0);
+    }
 
     // If we have the chat message style, update all message bubbles
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
