@@ -963,7 +963,7 @@ void LcdDisplay::SetupUI() {
     // Status chrome ≈ icon line + vertical pads; keep 12px below it before the clock.
     const int status_chrome_h = lvgl_theme->spacing(2) * 2 + 16;
     lv_obj_set_style_pad_top(home_panel_, status_chrome_h + 12, 0);
-    lv_obj_set_style_pad_bottom(home_panel_, lvgl_theme->spacing(4) + 28, 0);  // room for wake hint
+    lv_obj_set_style_pad_bottom(home_panel_, 6, 0);  // wake hint sits 6px above screen bottom
     lv_obj_set_style_pad_hor(home_panel_, 30, 0);
     // Top-down stack only — do NOT use SPACE_BETWEEN (it shrinks the clock block and clips humidity).
     lv_obj_set_flex_flow(home_panel_, LV_FLEX_FLOW_COLUMN);
@@ -1086,7 +1086,11 @@ void LcdDisplay::SetupUI() {
     home_wake_hint_label_ = lv_label_create(home_panel_);
     lv_obj_add_flag(home_wake_hint_label_, LV_OBJ_FLAG_FLOATING);  // ignore flex layout
     lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
-    lv_obj_set_style_text_color(home_wake_hint_label_, lvgl_theme->text_color(), 0);
+    // Slightly smaller than body text; keep theme font for CJK.
+    lv_obj_set_style_transform_scale(home_wake_hint_label_, 204, 0);  // 204/256 ≈ 0.8x
+    lv_obj_set_style_transform_pivot_x(home_wake_hint_label_, LV_PCT(50), 0);
+    lv_obj_set_style_transform_pivot_y(home_wake_hint_label_, LV_PCT(100), 0);
+    lv_obj_set_style_text_color(home_wake_hint_label_, lv_color_hex(0x9CA3AF), 0);
     lv_obj_set_style_text_opa(home_wake_hint_label_, LV_OPA_COVER, 0);
     lv_label_set_text(home_wake_hint_label_, "说“小智”开始对话");
     lv_obj_align(home_wake_hint_label_, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -1451,7 +1455,10 @@ void LcdDisplay::SetTheme(Theme* theme) {
     }
     if (home_wake_hint_label_ != nullptr) {
         lv_obj_set_style_text_font(home_wake_hint_label_, text_font, 0);
-        lv_obj_set_style_text_color(home_wake_hint_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_transform_scale(home_wake_hint_label_, 204, 0);
+        lv_obj_set_style_transform_pivot_x(home_wake_hint_label_, LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(home_wake_hint_label_, LV_PCT(100), 0);
+        lv_obj_set_style_text_color(home_wake_hint_label_, lv_color_hex(0x9CA3AF), 0);
         lv_obj_set_style_text_opa(home_wake_hint_label_, LV_OPA_COVER, 0);
     }
     if (home_time_label_ != nullptr) {
