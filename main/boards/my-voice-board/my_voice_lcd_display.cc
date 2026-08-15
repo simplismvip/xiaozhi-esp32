@@ -12,11 +12,11 @@ MyVoiceLcdDisplay::MyVoiceLcdDisplay(esp_lcd_panel_io_handle_t panel_io,
                     swap_xy) {}
 
 void MyVoiceLcdDisplay::EnsureAnimator() {
-    if (eye_animator_ == nullptr) {
-        eye_animator_ = std::make_unique<EyeEmotionAnimator>();
+    if (face_animator_ == nullptr) {
+        face_animator_ = std::make_unique<GrokbotEmotionAnimator>();
     }
-    if (!eye_animator_->IsCreated() && emoji_box_ != nullptr) {
-        eye_animator_->Create(emoji_box_);
+    if (!face_animator_->IsCreated() && emoji_box_ != nullptr) {
+        face_animator_->Create(emoji_box_);
     }
 }
 
@@ -31,8 +31,8 @@ void MyVoiceLcdDisplay::SetupUI() {
     if (emoji_image_ != nullptr) {
         lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
     }
-    if (eye_animator_ != nullptr) {
-        eye_animator_->SetEmotion(EyeEmotionType::kNormalBlink);
+    if (face_animator_ != nullptr) {
+        face_animator_->SetEmotion(GrokbotEmotionId::kNeutral);
     }
 }
 
@@ -55,7 +55,7 @@ void MyVoiceLcdDisplay::SetEmotion(const char* emotion) {
     }
 
     EnsureAnimator();
-    if (eye_animator_ != nullptr && eye_animator_->IsCreated()) {
-        eye_animator_->SetEmotionName(emotion);
+    if (face_animator_ != nullptr && face_animator_->IsCreated()) {
+        face_animator_->SetEmotionName(emotion);
     }
 }

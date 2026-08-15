@@ -2,11 +2,11 @@
 #define MY_VOICE_LCD_DISPLAY_H
 
 #include "display/lcd_display.h"
-#include "eye_emotion_animator.h"
+#include "grokbot_emotion_animator.h"
 
 #include <memory>
 
-// SpiLcdDisplay subclass: LVGL eye animations instead of GIF/Noto emoji for chat face.
+// SpiLcdDisplay subclass: GrokBot-style circular face instead of GIF/Noto emoji for chat face.
 class MyVoiceLcdDisplay : public SpiLcdDisplay {
 public:
     MyVoiceLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width,
@@ -19,7 +19,7 @@ public:
 private:
     void EnsureAnimator();
 
-    std::unique_ptr<EyeEmotionAnimator> eye_animator_;
+    std::unique_ptr<GrokbotEmotionAnimator> face_animator_;
 };
 
 #endif  // MY_VOICE_LCD_DISPLAY_H
