@@ -8,7 +8,7 @@ Custom voice assistant board for xiaozhi-esp32.
 - **Microphone**: INMP441 (I2S, full-duplex disabled, simplex mode)
 - **Speaker**: MAX98357A (I2S DAC + amplifier)
 - **Display (default)**: SPI ST7789 **portrait 240×320** on the carrier board (8-pin: GND VCC SCL SDA RST DC CS BLK)
-- **Emotions (SPI LCD)**: `noto-color-emoji_32` assets (official fonts package)
+- **Emotions (SPI LCD)**: LVGL `GrokbotEmotionAnimator` (see [Emotions](#emotions))
 - **Display (optional)**: I2C OLED (SSD1306 / SH1106) for breadboard prototyping
 - **LED**: Single LED on GPIO 48 (status indicator)
 - **Buttons**: BOOT (GPIO 2 on carrier), volume up/down (GPIO 38 / 39)
@@ -83,8 +83,7 @@ idf.py -p /dev/cu.usbserial-XXXX flash monitor
 
 - Top bar: Wi-Fi + battery (existing)
 - **Idle**: home panel with large clock, date, weather placeholders (`晴` / `0°C` / `湿度 0%`), and wake hint `说“小智”开始对话`
-- **Chat**: home panel hidden; LVGL eye-emotion animator (not GIF) + subtitles shown
-- Eye emotions map the 21 standard names onto 5 base animations (blink/sleep/happy/sad/angry); see `docs/superpowers/specs/2026-08-14-eye-emotion-animator-design.md`
+- **Chat**: home panel hidden; LVGL `GrokbotEmotionAnimator` + subtitles shown (see [Emotions](#emotions))
 - Backlight: 30s after entering idle → 20% (not written to NVS); leave idle restores saved brightness
 - Live weather/TH: later via `Display::SetHomeEnvironment(...)` (custom HTTP); phase 1 is placeholders only
 
@@ -94,6 +93,14 @@ Idle home appearance (2026-08-14):
 - Placeholders: `晴 0°C`, `湿度 0%`.
 - Status bar and wake hint unchanged.
 
+
+## Emotions
+
+Chat face uses LVGL [`GrokbotEmotionAnimator`](./grokbot_emotion_animator.h): a circular GrokBot-style face driven by the 21 standard protocol emotion names (`neutral`, `happy`, `laughing`, …).
+
+Visual reference (open in a browser): [`docs/superpowers/specs/assets/2026-08-15-grokbot-face-mockup.html`](../../../docs/superpowers/specs/assets/2026-08-15-grokbot-face-mockup.html)
+
+The previous [`EyeEmotionAnimator`](./eye_emotion_animator.h) remains in the tree but is unused, for easy revert.
 
 ## LED Status
 
