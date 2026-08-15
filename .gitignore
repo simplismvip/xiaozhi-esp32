@@ -20,3 +20,4 @@ mmap_generate_*.h
 .clangd
 
 .superpowers/
+.worktrees/
