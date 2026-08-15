@@ -47,11 +47,6 @@ private:
     void ResetParts();
     void ApplyEmotion(GrokbotEmotionId id);
 
-    static void AnimHeightCb(void* var, int32_t v);
-    static void AnimTranslateYCb(void* var, int32_t v);
-    static void AnimTranslateXCb(void* var, int32_t v);
-    static void AnimWidthCb(void* var, int32_t v);
-
     lv_obj_t* face_ = nullptr;
     lv_obj_t* eye_left_ = nullptr;
     lv_obj_t* eye_right_ = nullptr;

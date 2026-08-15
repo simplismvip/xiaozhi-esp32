@@ -311,22 +311,6 @@ GrokbotEmotionAnimator::~GrokbotEmotionAnimator() {
     }
 }
 
-void GrokbotEmotionAnimator::AnimHeightCb(void* var, int32_t v) {
-    HeightCb(var, v);
-}
-
-void GrokbotEmotionAnimator::AnimTranslateYCb(void* var, int32_t v) {
-    TranslateYCb(var, v);
-}
-
-void GrokbotEmotionAnimator::AnimTranslateXCb(void* var, int32_t v) {
-    TranslateXCb(var, v);
-}
-
-void GrokbotEmotionAnimator::AnimWidthCb(void* var, int32_t v) {
-    WidthCb(var, v);
-}
-
 GrokbotEmotionId GrokbotEmotionAnimator::MapName(const char* name) {
     if (name == nullptr || name[0] == '\0') {
         return GrokbotEmotionId::kNeutral;
@@ -490,6 +474,7 @@ void GrokbotEmotionAnimator::ResetParts() {
     }
     if (accent_label_ != nullptr) {
         lv_label_set_text(accent_label_, "");
+        lv_obj_set_style_text_color(accent_label_, lv_color_hex(kColorAccent), 0);
         Hide(accent_label_);
     }
 }
