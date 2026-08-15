@@ -1,5 +1,7 @@
 #include "grokbot_emotion_animator.h"
 
+#include <cstring>
+
 namespace {
 
 // Portrait 240x320 layout constants.
@@ -68,7 +70,74 @@ void GrokbotEmotionAnimator::AnimWidthCb(void* var, int32_t v) {
 }
 
 GrokbotEmotionId GrokbotEmotionAnimator::MapName(const char* name) {
-    (void)name;
+    if (name == nullptr || name[0] == '\0') {
+        return GrokbotEmotionId::kNeutral;
+    }
+
+    if (strcmp(name, "neutral") == 0) {
+        return GrokbotEmotionId::kNeutral;
+    }
+    if (strcmp(name, "happy") == 0) {
+        return GrokbotEmotionId::kHappy;
+    }
+    if (strcmp(name, "laughing") == 0) {
+        return GrokbotEmotionId::kLaughing;
+    }
+    if (strcmp(name, "funny") == 0) {
+        return GrokbotEmotionId::kFunny;
+    }
+    if (strcmp(name, "sad") == 0) {
+        return GrokbotEmotionId::kSad;
+    }
+    if (strcmp(name, "angry") == 0) {
+        return GrokbotEmotionId::kAngry;
+    }
+    if (strcmp(name, "crying") == 0) {
+        return GrokbotEmotionId::kCrying;
+    }
+    if (strcmp(name, "loving") == 0) {
+        return GrokbotEmotionId::kLoving;
+    }
+    if (strcmp(name, "embarrassed") == 0) {
+        return GrokbotEmotionId::kEmbarrassed;
+    }
+    if (strcmp(name, "surprised") == 0) {
+        return GrokbotEmotionId::kSurprised;
+    }
+    if (strcmp(name, "shocked") == 0) {
+        return GrokbotEmotionId::kShocked;
+    }
+    if (strcmp(name, "thinking") == 0) {
+        return GrokbotEmotionId::kThinking;
+    }
+    if (strcmp(name, "winking") == 0) {
+        return GrokbotEmotionId::kWinking;
+    }
+    if (strcmp(name, "cool") == 0) {
+        return GrokbotEmotionId::kCool;
+    }
+    if (strcmp(name, "relaxed") == 0) {
+        return GrokbotEmotionId::kRelaxed;
+    }
+    if (strcmp(name, "delicious") == 0) {
+        return GrokbotEmotionId::kDelicious;
+    }
+    if (strcmp(name, "kissy") == 0) {
+        return GrokbotEmotionId::kKissy;
+    }
+    if (strcmp(name, "confident") == 0) {
+        return GrokbotEmotionId::kConfident;
+    }
+    if (strcmp(name, "sleepy") == 0) {
+        return GrokbotEmotionId::kSleepy;
+    }
+    if (strcmp(name, "silly") == 0) {
+        return GrokbotEmotionId::kSilly;
+    }
+    if (strcmp(name, "confused") == 0) {
+        return GrokbotEmotionId::kConfused;
+    }
+
     return GrokbotEmotionId::kNeutral;
 }
 
