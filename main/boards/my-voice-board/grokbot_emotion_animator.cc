@@ -380,6 +380,9 @@ GrokbotEmotionId GrokbotEmotionAnimator::MapName(const char* name) {
     if (strcmp(name, "confused") == 0) {
         return GrokbotEmotionId::kConfused;
     }
+    if (strcmp(name, "speaking") == 0) {
+        return GrokbotEmotionId::kSpeaking;
+    }
 
     return GrokbotEmotionId::kNeutral;
 }
@@ -493,15 +496,13 @@ void GrokbotEmotionAnimator::ApplyEmotion(GrokbotEmotionId id) {
             break;
 
         case GrokbotEmotionId::kHappy:
-            // Talking / speaking face: crescent eyes + mouth open-close.
             SetCrescentEyes(eye_left_, eye_right_, 16, 5);
             SetFilledSmile(mouth_, 38, 18);
             ShowCheeks(cheek_left_, cheek_right_);
             StartBounce(face_, 4, 500);
             StartHeightPulse(eye_left_, 16, 12, 600);
             StartHeightPulse(eye_right_, 16, 12, 600);
-            StartHeightPulse(mouth_, 18, 10, 280);
-            StartWidthPulse(mouth_, 38, 28, 280);
+            StartHeightPulse(mouth_, 18, 14, 900);
             break;
 
         case GrokbotEmotionId::kLaughing:
@@ -511,8 +512,7 @@ void GrokbotEmotionAnimator::ApplyEmotion(GrokbotEmotionId id) {
             StartBounce(face_, 6, 280);
             StartHeightPulse(eye_left_, 12, 8, 275);
             StartHeightPulse(eye_right_, 12, 8, 275);
-            StartHeightPulse(mouth_, 24, 14, 220);
-            StartWidthPulse(mouth_, 44, 34, 220);
+            StartHeightPulse(mouth_, 24, 16, 275);
             break;
 
         case GrokbotEmotionId::kFunny:
@@ -696,6 +696,19 @@ void GrokbotEmotionAnimator::ApplyEmotion(GrokbotEmotionId id) {
             SetAccent(accent_label_, "?", -6, 18);
             StartShake(face_, 3, 700);
             StartBounce(face_, 2, 700);
+            break;
+
+        case GrokbotEmotionId::kSpeaking:
+            // Dedicated TTS face: open eyes + oval mouth opening/closing.
+            StartBlink(eye_left_, eye, blink_min, 120, 2200);
+            StartBlink(eye_right_, eye, blink_min, 120, 2200);
+            SetRoundMouth(mouth_, 20, true, kColorInk);
+            lv_obj_set_size(mouth_, 26, 18);
+            lv_obj_set_style_radius(mouth_, 12, 0);
+            lv_obj_align(mouth_, LV_ALIGN_CENTER, 0, kMouthYOffset);
+            StartBounce(face_, 3, 700);
+            StartWidthPulse(mouth_, 18, 30, 240);
+            StartHeightPulse(mouth_, 10, 20, 240);
             break;
     }
 }

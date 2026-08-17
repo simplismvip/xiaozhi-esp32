@@ -25,6 +25,7 @@ enum class GrokbotEmotionId {
     kSleepy,
     kSilly,
     kConfused,
+    kSpeaking,
 };
 
 // Circular GrokBot-inspired face for my-voice-board (replaces GIF at integration).
