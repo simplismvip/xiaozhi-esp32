@@ -181,6 +181,8 @@ private:
     void OnStateChanged(DeviceState old_state, DeviceState new_state);
 
     esp_timer_handle_t idle_dim_timer_ = nullptr;
+    // 0: waiting for dim; 1: dimmed, waiting for blank (backlight 0).
+    uint8_t idle_dim_phase_ = 0;
     void StartIdleDimTimer();
     void CancelIdleDimTimer();
     void OnIdleDimTimer();
