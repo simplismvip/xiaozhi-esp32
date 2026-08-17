@@ -1,0 +1,14 @@
+# xiaozhi overlay example (place as data/.config.yaml — do not commit real keys)
+
+server:
+  websocket: ws://192.168.1.9:8000/xiaozhi/v1/
+  http_port: 8003
+
+plugins:
+  get_weather:
+    api_url: http://172.17.0.1:3030/api/weather
+    # empty = resolve city from device/public IP (see patches/get_weather.py)
+    default_location: ""
+
+# Fill selected_module / LLM / ASR / TTS from your deployment.
+# Never commit real api_key / access_key_secret values.

@@ -1,0 +1,11 @@
+{
+  "port": 3030,
+  "host": "0.0.0.0",
+  "default_city": "家里",
+  "cache_ttl_sec": 600,
+  "user_agent": "Mozilla/5.0 (compatible; xiaozhi-apis/0.1)",
+  "ha_base_url": "http://127.0.0.1:8123",
+  "ha_token": "REPLACE_ME_HA_LONG_LIVED_TOKEN",
+  "ha_weather_entity": "weather.YOUR_ENTITY",
+  "ha_city_label": "家里"
+}

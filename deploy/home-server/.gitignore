@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+config.json
+data/.config.yaml
+data/.mcp_server_settings.json
+models/
+*.bak*
+.env

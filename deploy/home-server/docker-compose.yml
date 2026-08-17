@@ -1,0 +1,17 @@
+services:
+  xiaozhi-esp32-server:
+    image: ghcr.io/xinnan-tech/xiaozhi-esp32-server:server_latest
+    container_name: xiaozhi-esp32-server
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "8000:8000"
+      - "8003:8003"
+    volumes:
+      - ./data:/opt/xiaozhi-esp32-server/data
+      - ./models:/opt/xiaozhi-esp32-server/models
+      - ./patches/openai.py:/opt/xiaozhi-esp32-server/core/providers/llm/openai/openai.py:ro
+      - ./patches/get_weather.py:/opt/xiaozhi-esp32-server/plugins_func/functions/get_weather.py:ro
