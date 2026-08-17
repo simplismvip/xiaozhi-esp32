@@ -15,3 +15,4 @@ services:
       - ./models:/opt/xiaozhi-esp32-server/models
       - ./patches/openai.py:/opt/xiaozhi-esp32-server/core/providers/llm/openai/openai.py:ro
       - ./patches/get_weather.py:/opt/xiaozhi-esp32-server/plugins_func/functions/get_weather.py:ro
+      - ./patches/minimax_httpstream.py:/opt/xiaozhi-esp32-server/core/providers/tts/minimax_httpstream.py:ro

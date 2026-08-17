@@ -10,5 +10,31 @@ plugins:
     # empty = resolve city from device/public IP (see patches/get_weather.py)
     default_location: ""
 
-# Fill selected_module / LLM / ASR / TTS from your deployment.
+# Keep Intent tools minimal; add search/news later via xiaozhi-apis if needed.
+Intent:
+  function_call:
+    type: function_call
+    functions:
+      - change_role
+      - get_weather
+
+# Fill selected_module / LLM / ASR from your deployment.
 # Never commit real api_key / access_key_secret values.
+
+# TTS: MiniMax HTTP stream (system voice; clone later if needed)
+selected_module:
+  TTS: MinimaxTTSHTTPStream
+
+TTS:
+  MinimaxTTSHTTPStream:
+    type: minimax_httpstream
+    output_dir: tmp/
+    group_id: ""   # optional/legacy; leave empty for official Bearer-only T2A
+    api_key: REPLACE_WITH_MINIMAX_API_KEY
+    model: speech-2.6-turbo
+    voice_id: female-shaonv
+  # Rollback:
+  # EdgeTTS:
+  #   type: edge
+  #   voice: zh-CN-XiaoxiaoNeural
+  #   output_dir: tmp/

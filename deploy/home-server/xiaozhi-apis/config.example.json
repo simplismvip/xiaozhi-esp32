@@ -7,5 +7,8 @@
   "ha_base_url": "http://127.0.0.1:8123",
   "ha_token": "REPLACE_ME_HA_LONG_LIVED_TOKEN",
   "ha_weather_entity": "weather.YOUR_ENTITY",
-  "ha_city_label": "家里"
+  "ha_city_label": "家里",
+  "minimax_api_key": "REPLACE_WITH_MINIMAX_API_KEY",
+  "minimax_api_base": "https://api.minimaxi.com",
+  "minimax_tts_model": "speech-2.6-turbo"
 }
