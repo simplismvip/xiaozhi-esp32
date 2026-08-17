@@ -5,14 +5,15 @@
 namespace {
 
 // Portrait 240x320 layout constants.
-constexpr lv_coord_t kFace = 168;
-constexpr lv_coord_t kEye = 44;
-constexpr lv_coord_t kEyeGap = 30;
+// Keep face under ~150px so bounce/blink does not clip the emoji_box top edge.
+constexpr lv_coord_t kFace = 148;
+constexpr lv_coord_t kEye = 38;
+constexpr lv_coord_t kEyeGap = 26;
 
-constexpr lv_coord_t kMouthNeutralW = 18;
+constexpr lv_coord_t kMouthNeutralW = 16;
 constexpr lv_coord_t kMouthNeutralH = 5;
-constexpr lv_coord_t kEyeYOffset = -18;
-constexpr lv_coord_t kMouthYOffset = 32;
+constexpr lv_coord_t kEyeYOffset = -16;
+constexpr lv_coord_t kMouthYOffset = 28;
 
 constexpr uint32_t kColorFace = 0xF4F1EA;
 constexpr uint32_t kColorInk = 0x1A1A1E;
@@ -492,21 +493,26 @@ void GrokbotEmotionAnimator::ApplyEmotion(GrokbotEmotionId id) {
             break;
 
         case GrokbotEmotionId::kHappy:
-            SetCrescentEyes(eye_left_, eye_right_, 18, 6);
-            SetFilledSmile(mouth_, 44, 22);
+            // Talking / speaking face: crescent eyes + mouth open-close.
+            SetCrescentEyes(eye_left_, eye_right_, 16, 5);
+            SetFilledSmile(mouth_, 38, 18);
             ShowCheeks(cheek_left_, cheek_right_);
-            StartBounce(face_, 6, 400);
-            StartHeightPulse(eye_left_, 18, 14, 600);
-            StartHeightPulse(eye_right_, 18, 14, 600);
+            StartBounce(face_, 4, 500);
+            StartHeightPulse(eye_left_, 16, 12, 600);
+            StartHeightPulse(eye_right_, 16, 12, 600);
+            StartHeightPulse(mouth_, 18, 10, 280);
+            StartWidthPulse(mouth_, 38, 28, 280);
             break;
 
         case GrokbotEmotionId::kLaughing:
-            SetCrescentEyes(eye_left_, eye_right_, 14, 8);
-            SetFilledSmile(mouth_, 52, 28);
+            SetCrescentEyes(eye_left_, eye_right_, 12, 7);
+            SetFilledSmile(mouth_, 44, 24);
             ShowCheeks(cheek_left_, cheek_right_);
-            StartBounce(face_, 10, 250);
-            StartHeightPulse(eye_left_, 14, 10, 275);
-            StartHeightPulse(eye_right_, 14, 10, 275);
+            StartBounce(face_, 6, 280);
+            StartHeightPulse(eye_left_, 12, 8, 275);
+            StartHeightPulse(eye_right_, 12, 8, 275);
+            StartHeightPulse(mouth_, 24, 14, 220);
+            StartWidthPulse(mouth_, 44, 34, 220);
             break;
 
         case GrokbotEmotionId::kFunny:
@@ -575,20 +581,20 @@ void GrokbotEmotionAnimator::ApplyEmotion(GrokbotEmotionId id) {
             break;
 
         case GrokbotEmotionId::kSurprised:
-            lv_obj_set_size(eye_left_, 54, 54);
-            lv_obj_set_size(eye_right_, 54, 54);
-            SetRoundMouth(mouth_, 22, true, kColorInk);
-            StartBounce(face_, 8, 650);
-            StartWidthPulse(eye_left_, 54, 50, 650);
-            StartWidthPulse(eye_right_, 54, 50, 650);
+            lv_obj_set_size(eye_left_, 46, 46);
+            lv_obj_set_size(eye_right_, 46, 46);
+            SetRoundMouth(mouth_, 18, true, kColorInk);
+            StartBounce(face_, 5, 650);
+            StartWidthPulse(eye_left_, 46, 42, 650);
+            StartWidthPulse(eye_right_, 46, 42, 650);
             break;
 
         case GrokbotEmotionId::kShocked:
-            lv_obj_set_size(eye_left_, 56, 56);
-            lv_obj_set_size(eye_right_, 56, 56);
-            SetRoundMouth(mouth_, 28, true, kColorInk);
+            lv_obj_set_size(eye_left_, 48, 48);
+            lv_obj_set_size(eye_right_, 48, 48);
+            SetRoundMouth(mouth_, 22, true, kColorInk);
             ShowBrows(brow_left_, brow_right_, -12, 12, 42);
-            StartShake(face_, 4, 45);
+            StartShake(face_, 3, 45);
             break;
 
         case GrokbotEmotionId::kThinking:
@@ -737,12 +743,12 @@ void GrokbotEmotionAnimator::Create(lv_obj_t* parent) {
         }
 
         lv_obj_t* highlight = lv_obj_create(eye);
-        lv_obj_set_size(highlight, 10, 10);
+        lv_obj_set_size(highlight, 8, 8);
         lv_obj_set_style_border_width(highlight, 0, 0);
         lv_obj_set_style_bg_color(highlight, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_radius(highlight, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_scrollbar_mode(highlight, LV_SCROLLBAR_MODE_OFF);
-        lv_obj_align(highlight, LV_ALIGN_TOP_LEFT, 4, 4);
+        lv_obj_align(highlight, LV_ALIGN_TOP_LEFT, 3, 3);
     }
 
     mouth_ = lv_obj_create(face_);
