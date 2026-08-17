@@ -965,9 +965,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_top(home_panel_, status_chrome_h + 12, 0);
     lv_obj_set_style_pad_bottom(home_panel_, 6, 0);  // wake hint sits 6px above screen bottom
     lv_obj_set_style_pad_hor(home_panel_, 30, 0);
-    // Top-down stack only — do NOT use SPACE_BETWEEN (it shrinks the clock block and clips humidity).
+    // Top-down stack only — do NOT use SPACE_BETWEEN (it shrinks the clock block and clips
+    // humidity).
     lv_obj_set_flex_flow(home_panel_, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(home_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(home_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
     lv_obj_align(home_panel_, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_HIDDEN);  // shown when idle
     lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
@@ -982,7 +984,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(clock_col, 0, 0);
     lv_obj_set_style_pad_all(clock_col, 0, 0);
     lv_obj_set_flex_flow(clock_col, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(clock_col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(clock_col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
     lv_obj_set_flex_grow(clock_col, 0);
     lv_obj_add_flag(clock_col, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     lv_obj_clear_flag(clock_col, LV_OBJ_FLAG_SCROLLABLE);
@@ -1071,13 +1074,13 @@ void LcdDisplay::SetupUI() {
     home_temp_label_ = lv_label_create(weather_temp_row);
     lv_obj_set_style_text_font(home_temp_label_, text_font, 0);
     lv_obj_set_style_text_color(home_temp_label_, lv_color_hex(0xFBBF24), 0);
-    lv_label_set_text(home_temp_label_, "0°C");
+    lv_label_set_text(home_temp_label_, "--°C");
 
     home_humidity_label_ = lv_label_create(env_col);
     lv_obj_set_style_text_font(home_humidity_label_, text_font, 0);
     lv_obj_set_style_text_color(home_humidity_label_, lv_color_hex(0x86EFAC), 0);
     lv_label_set_long_mode(home_humidity_label_, LV_LABEL_LONG_CLIP);
-    lv_label_set_text(home_humidity_label_, "湿度 0%");
+    lv_label_set_text(home_humidity_label_, "湿度 --%");
 
     // Intentionally no home_weather_icon_; future metrics (e.g. pressure) = new labels under
     // humidity.

@@ -4,6 +4,7 @@
 #include "audio_codec.h"
 #include "board.h"
 #include "display.h"
+#include "home_environment.h"
 #include "mcp_server.h"
 #include "mqtt_protocol.h"
 #include "settings.h"
@@ -270,6 +271,10 @@ void Application::Run() {
             display->UpdateStatusBar();
             if (GetDeviceState() == kDeviceStateIdle) {
                 UpdateHomeClock();
+                // Refresh weather/TH about every 10 minutes while idle.
+                if (clock_ticks_ - home_env_last_fetch_tick_ >= 600) {
+                    RequestHomeEnvironmentRefresh(false);
+                }
             }
 
             // Print debug info every 10 seconds
@@ -307,6 +312,10 @@ void Application::HandleNetworkConnectedEvent() {
     // Update the status bar immediately to show the network state
     auto display = Board::GetInstance().GetDisplay();
     display->UpdateStatusBar(true);
+
+    if (GetDeviceState() == kDeviceStateIdle) {
+        RequestHomeEnvironmentRefresh(true);
+    }
 }
 
 void Application::HandleNetworkDisconnectedEvent() {
@@ -951,12 +960,61 @@ void Application::UpdateHomeClock() {
     Board::GetInstance().GetDisplay()->SetHomeClock(time_buf, date_buf);
 }
 
+void Application::ApplyHomeEnvironment(const std::string& weather, const std::string& temp,
+                                       const std::string& humidity_text) {
+    home_weather_ = weather;
+    home_temp_ = temp;
+    home_humidity_ = humidity_text;
+    if (GetDeviceState() == kDeviceStateIdle) {
+        Board::GetInstance().GetDisplay()->SetHomeEnvironment(
+            home_weather_.c_str(), home_temp_.c_str(), home_humidity_.c_str());
+    }
+}
+
+void Application::HomeEnvironmentFetchTask(void* arg) {
+    auto* app = static_cast<Application*>(arg);
+    HomeEnvironmentData data;
+    bool ok = FetchHomeEnvironment(data);
+    if (ok) {
+        app->Schedule([app, data]() {
+            app->ApplyHomeEnvironment(data.weather, data.temp, data.humidity_text);
+        });
+    }
+    app->Schedule([app]() {
+        app->home_env_fetching_ = false;
+        app->home_env_last_fetch_tick_ = app->clock_ticks_;
+    });
+    vTaskDelete(nullptr);
+}
+
+void Application::RequestHomeEnvironmentRefresh(bool force) {
+    const char* url = CONFIG_HOME_ENV_URL;
+    if (url == nullptr || url[0] == '\0') {
+        (void)force;
+        return;
+    }
+    if (home_env_fetching_) {
+        return;
+    }
+    if (!force && clock_ticks_ - home_env_last_fetch_tick_ < 600) {
+        return;
+    }
+    home_env_fetching_ = true;
+    BaseType_t created = xTaskCreate(HomeEnvironmentFetchTask, "home_env", 4096, this, 3, nullptr);
+    if (created != pdPASS) {
+        home_env_fetching_ = false;
+        ESP_LOGW(TAG, "Failed to start home_env task");
+    }
+}
+
 void Application::SetHomeMode(bool home_visible) {
     auto display = Board::GetInstance().GetDisplay();
     display->SetHomeVisible(home_visible);
     if (home_visible) {
-        display->SetHomeEnvironment("晴", "0°C", "湿度 0%");
+        display->SetHomeEnvironment(home_weather_.c_str(), home_temp_.c_str(),
+                                    home_humidity_.c_str());
         UpdateHomeClock();
+        RequestHomeEnvironmentRefresh(true);
     }
 }
 

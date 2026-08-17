@@ -1034,6 +1034,15 @@ menu "Music Gener Player"
             LAN URL reachable from the ESP32, e.g. http://192.168.1.8:3020
 endmenu
 
+config HOME_ENV_URL
+    string "Idle home weather/TH HTTP URL (empty = disabled)"
+    default ""
+    help
+        Full URL for GET JSON used by the idle home panel, e.g.
+        http://192.168.1.9:3030/api/weather. Expected fields: weather, temp,
+        humidity_text. Leave empty to keep placeholders and skip network fetch.
+
+
 config AUDIO_DEBUG_UDP_SERVER
     string "Audio Debug UDP Server Address"
     default "192.168.2.100:8000"

@@ -10,8 +10,10 @@
             "sdkconfig_append": [
                 "CONFIG_MY_VOICE_DISPLAY_SPI_LCD=y",
                 "CONFIG_MY_VOICE_LCD_ST7789_240X320=y",
+                "CONFIG_OTA_URL=\"http://192.168.1.9:8003/xiaozhi/ota/\"",
+                "CONFIG_HOME_ENV_URL=\"http://192.168.1.9:3030/api/weather\"",
                 "CONFIG_USE_MUSIC_PLAYER=y",
-                "CONFIG_MUSIC_GENER_BASE_URL=\"http://192.168.1.8:3020\""
+                "CONFIG_MUSIC_GENER_BASE_URL=\"http://192.168.1.9:3020\""
             ]
         }
     ]
