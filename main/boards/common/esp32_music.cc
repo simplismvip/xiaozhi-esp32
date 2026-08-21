@@ -12,10 +12,74 @@
 #include <cJSON.h>
 #include <cstring>
 #include <algorithm>
+#include <vector>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include "esp_ae_rate_cvt.h"
+
 #define TAG "Esp32Music"
+
+#define MUSIC_RATE_CVT_CFG(_src_rate, _dest_rate)           \
+    (esp_ae_rate_cvt_cfg_t) {                               \
+        .src_rate = (uint32_t)(_src_rate),                  \
+        .dest_rate = (uint32_t)(_dest_rate),                \
+        .channel = (uint8_t)ESP_AUDIO_MONO,                 \
+        .bits_per_sample = ESP_AUDIO_BIT16,                 \
+        .complexity = 2,                                    \
+        .perf_type = ESP_AE_RATE_CVT_PERF_TYPE_SPEED,       \
+    }
+
+// MP3 streams are typically 44100 Hz stereo; the board I2S TX is often 24000 Hz.
+// Writing unresampled PCM plays slow and low. Recreate the converter if the
+// source rate changes between songs.
+static bool ResampleMusicPcm(esp_ae_rate_cvt_handle_t* rate_cvt, int* opened_src_rate, int src_rate,
+                             int dest_rate, const int16_t* input, int input_samples,
+                             std::vector<int16_t>& output) {
+    if (input_samples <= 0) {
+        output.clear();
+        return true;
+    }
+    if (src_rate <= 0 || dest_rate <= 0) {
+        return false;
+    }
+    if (src_rate == dest_rate) {
+        output.assign(input, input + input_samples);
+        return true;
+    }
+    if (*rate_cvt == nullptr || *opened_src_rate != src_rate) {
+        if (*rate_cvt != nullptr) {
+            esp_ae_rate_cvt_close(*rate_cvt);
+            *rate_cvt = nullptr;
+        }
+        esp_ae_rate_cvt_cfg_t cfg = MUSIC_RATE_CVT_CFG(src_rate, dest_rate);
+        auto ret = esp_ae_rate_cvt_open(&cfg, rate_cvt);
+        if (*rate_cvt == nullptr) {
+            ESP_LOGE(TAG, "Failed to open music resampler %d -> %d Hz, err=%d", src_rate, dest_rate,
+                     ret);
+            return false;
+        }
+        *opened_src_rate = src_rate;
+        ESP_LOGI(TAG, "Music resampler %d -> %d Hz", src_rate, dest_rate);
+    }
+
+    uint32_t max_out = 0;
+    if (esp_ae_rate_cvt_get_max_out_sample_num(*rate_cvt, (uint32_t)input_samples, &max_out) !=
+        ESP_AE_ERR_OK) {
+        return false;
+    }
+    output.resize(max_out);
+    uint32_t actual = max_out;
+    auto ret = esp_ae_rate_cvt_process(*rate_cvt, (esp_ae_sample_t)input, (uint32_t)input_samples,
+                                       (esp_ae_sample_t)output.data(), &actual);
+    if (ret != ESP_AE_ERR_OK) {
+        ESP_LOGW(TAG, "Music resample failed: %d", ret);
+        output.clear();
+        return false;
+    }
+    output.resize(actual);
+    return true;
+}
 
 static std::string url_encode(const std::string& str) {
     std::string encoded;
@@ -464,6 +528,9 @@ void Esp32Music::PlayAudioStream() {
     if (!codec->output_enabled()) {
         codec->EnableOutput(true);
     }
+    const int output_rate = codec->output_sample_rate();
+    esp_ae_rate_cvt_handle_t rate_cvt = nullptr;
+    int opened_src_rate = 0;
 
     if (!mp3_decoder_initialized_) {
         ESP_LOGE(TAG, "MP3 decoder not initialized");
@@ -682,18 +749,28 @@ void Esp32Music::PlayAudioStream() {
                     final_sample_count = mono_samples;
                 }
 
+                std::vector<int16_t> resampled_buffer;
+                if (!ResampleMusicPcm(&rate_cvt, &opened_src_rate, mp3_frame_info_.samprate,
+                                      output_rate, final_pcm_data, final_sample_count,
+                                      resampled_buffer)) {
+                    ESP_LOGW(TAG, "Music resample failed, dropping frame");
+                    continue;
+                }
+                if (resampled_buffer.empty()) {
+                    continue;
+                }
+
                 if (!codec->output_enabled()) {
                     codec->EnableOutput(true);
                 }
-                std::vector<int16_t> output(final_pcm_data, final_pcm_data + final_sample_count);
-                codec->OutputData(output);
-                size_t frame_bytes = final_sample_count * sizeof(int16_t);
+                codec->OutputData(resampled_buffer);
+                size_t frame_bytes = resampled_buffer.size() * sizeof(int16_t);
                 bool first_audio = (total_played == 0);
                 total_played += frame_bytes;
 
                 if (first_audio || total_played % (128 * 1024) < frame_bytes) {
-                    ESP_LOGI(TAG, "Played %u bytes, rate=%d ch=%d buffer=%u",
-                             (unsigned)total_played, mp3_frame_info_.samprate,
+                    ESP_LOGI(TAG, "Played %u bytes, src=%d Hz out=%d Hz ch=%d buffer=%u",
+                             (unsigned)total_played, mp3_frame_info_.samprate, output_rate,
                              mp3_frame_info_.nChans, (unsigned)buffer_size_);
                 }
             }
@@ -714,6 +791,10 @@ void Esp32Music::PlayAudioStream() {
 
     heap_caps_free(pcm_buffer);
     heap_caps_free(mp3_input_buffer);
+    if (rate_cvt != nullptr) {
+        esp_ae_rate_cvt_close(rate_cvt);
+        rate_cvt = nullptr;
+    }
     is_playing_ = false;
 
     auto display = Board::GetInstance().GetDisplay();
