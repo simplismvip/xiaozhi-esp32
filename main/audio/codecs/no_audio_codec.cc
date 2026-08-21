@@ -233,8 +233,15 @@ int NoAudioCodec::Write(const int16_t* data, int samples) {
         }
     }
 
-    size_t bytes_written;
-    ESP_ERROR_CHECK(i2s_channel_write(tx_handle_, buffer.data(), samples * sizeof(int32_t), &bytes_written, portMAX_DELAY));
+    size_t bytes_written = 0;
+    // Bound the wait so EnableOutput / StopStreaming cannot block forever on
+    // the same mutex while a music or TTS frame is in flight.
+    esp_err_t err = i2s_channel_write(tx_handle_, buffer.data(), samples * sizeof(int32_t),
+                                      &bytes_written, pdMS_TO_TICKS(1000));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "I2S write failed: %s", esp_err_to_name(err));
+        return static_cast<int>(bytes_written / sizeof(int32_t));
+    }
     return bytes_written / sizeof(int32_t);
 }
 

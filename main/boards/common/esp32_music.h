@@ -68,6 +68,7 @@ public:
     bool StartStreaming(const std::string& music_url) override;
     bool StopStreaming() override;
     bool IsPlaying() const override { return is_playing_.load(); }
+    bool IsActive() const override { return is_playing_.load() || is_downloading_.load(); }
     bool Pause() override;
     bool Resume() override;
     bool Next() override;

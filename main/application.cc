@@ -95,6 +95,15 @@ void Application::Initialize() {
 
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
+        // Maggotxy: music is allowed only in idle. Leaving idle (wake, button,
+        // new conversation) hard-stops playback and does not resume.
+        if (old_state == kDeviceStateIdle && new_state != kDeviceStateIdle) {
+            auto* music = Board::GetInstance().GetMusic();
+            if (music && music->IsActive()) {
+                ESP_LOGI(TAG, "Leaving idle, stopping music");
+                music->StopStreaming();
+            }
+        }
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
     });
 
@@ -566,6 +575,10 @@ void Application::InitializeProtocol() {
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
             display->SetChatMessage("system", "");
+            // Closing the channel for music must not clobber an in-flight wake.
+            if (GetDeviceState() == kDeviceStateConnecting) {
+                return;
+            }
             SetDeviceState(kDeviceStateIdle);
         });
     });
@@ -584,11 +597,21 @@ void Application::InitializeProtocol() {
             }
             if (strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
+                    auto* music = Board::GetInstance().GetMusic();
+                    if (music && music->IsActive()) {
+                        ESP_LOGI(TAG, "Ignore TTS start while music is active");
+                        return;
+                    }
                     aborted_ = false;
                     SetDeviceState(kDeviceStateSpeaking);
                 });
             } else if (strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
+                    auto* music = Board::GetInstance().GetMusic();
+                    if (music && music->IsActive()) {
+                        DismissChatForMusic();
+                        return;
+                    }
                     if (GetDeviceState() == kDeviceStateSpeaking) {
                         if (listening_mode_ == kListeningModeManualStop) {
                             SetDeviceState(kDeviceStateIdle);
@@ -728,6 +751,21 @@ void Application::DismissAlert() {
 }
 
 void Application::ToggleChatState() { xEventGroupSetBits(event_group_, MAIN_EVENT_TOGGLE_CHAT); }
+
+void Application::DismissChatForMusic() {
+    pending_listening_start_ = false;
+    if (GetDeviceState() == kDeviceStateSpeaking) {
+        AbortSpeaking(kAbortReasonNone);
+    }
+    if (protocol_ && protocol_->IsAudioChannelOpened()) {
+        protocol_->CloseAudioChannel();
+    }
+    if (GetDeviceState() != kDeviceStateIdle) {
+        SetDeviceState(kDeviceStateIdle);
+    }
+    audio_service_.EnableVoiceProcessing(false);
+    audio_service_.EnableWakeWordDetection(true);
+}
 
 void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_START_LISTENING); }
 
@@ -1083,6 +1121,8 @@ void Application::HandleStateChangedEvent() {
             SetHomeMode(true);
             StartIdleDimTimer();
             audio_service_.EnableVoiceProcessing(false);
+            // Idle is the only state where music plays; keep AFE wake enabled
+            // so a wake word can hard-stop the song and start a new conversation.
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:

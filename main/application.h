@@ -117,6 +117,13 @@ public:
     AudioService& GetAudioService() { return audio_service_; }
 
     /**
+     * End the current chat turn and return to idle so music can play with
+     * wake-word detection enabled. Thread-safe via Schedule if needed; call
+     * from the main task or via Application::Schedule().
+     */
+    void DismissChatForMusic();
+
+    /**
      * Reset protocol resources (thread-safe)
      * Can be called from any task to release resources allocated after network connected
      * This includes closing audio channel, resetting protocol and ota objects

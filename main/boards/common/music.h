@@ -13,6 +13,8 @@ public:
     virtual bool StartStreaming(const std::string& music_url) = 0;
     virtual bool StopStreaming() = 0;
     virtual bool IsPlaying() const = 0;
+    // True while a play-song request is resolving, buffering, or outputting.
+    virtual bool IsActive() const { return IsPlaying(); }
 
     virtual bool Pause() = 0;
     virtual bool Resume() = 0;

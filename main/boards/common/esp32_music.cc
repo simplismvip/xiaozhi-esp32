@@ -157,6 +157,9 @@ bool Esp32Music::Download(const std::string& song_name, const std::string& artis
 
     ESP_LOGI(TAG, "play-resolve: %s", full_url.c_str());
 
+    is_downloading_ = true;
+    Application::GetInstance().Schedule([]() { Application::GetInstance().DismissChatForMusic(); });
+
     auto network = Board::GetInstance().GetNetwork();
     auto http = network->CreateHttp(0);
     http->SetHeader("User-Agent", "ESP32-Xiaozhi-Music/1.0");
@@ -165,17 +168,28 @@ bool Esp32Music::Download(const std::string& song_name, const std::string& artis
 
     if (!http->Open("GET", full_url)) {
         ESP_LOGE(TAG, "play-resolve connect failed");
+        is_downloading_ = false;
         return false;
     }
     if (http->GetStatusCode() != 200) {
         ESP_LOGE(TAG, "play-resolve HTTP %d", http->GetStatusCode());
         http->Close();
+        is_downloading_ = false;
         return false;
     }
     last_downloaded_data_ = http->ReadAll();
     http->Close();
 
-    return ApplyResolveJson(last_downloaded_data_);
+    if (!is_downloading_.load()) {
+        ESP_LOGI(TAG, "play-resolve aborted");
+        return false;
+    }
+
+    bool started = ApplyResolveJson(last_downloaded_data_);
+    if (!started) {
+        is_downloading_ = false;
+    }
+    return started;
 #endif
 }
 
@@ -306,8 +320,9 @@ bool Esp32Music::StartStreaming(const std::string& music_url) {
 
     ESP_LOGI(TAG, "Starting streaming for URL: %s", music_url.c_str());
 
-    is_downloading_ = false;
     is_playing_ = false;
+    is_downloading_ = true;
+    Application::GetInstance().Schedule([]() { Application::GetInstance().DismissChatForMusic(); });
 
     if (download_thread_.joinable()) {
         {
@@ -587,12 +602,11 @@ void Esp32Music::PlayAudioStream() {
         auto& app = Application::GetInstance();
         DeviceState current_state = app.GetDeviceState();
 
-        if (current_state == kDeviceStateListening || current_state == kDeviceStateSpeaking) {
-            ESP_LOGI(TAG, "Device state %d, ToggleChatState for music playback", (int)current_state);
-            app.ToggleChatState();
-            vTaskDelay(pdMS_TO_TICKS(300));
-            continue;
-        } else if (current_state != kDeviceStateIdle) {
+        // Output only in idle (Maggotxy). Do not ToggleChatState from this
+        // thread: on 2.4 that event is asynchronous and a second toggle from
+        // idle would re-enter listening. Application::DismissChatForMusic()
+        // is responsible for returning to idle.
+        if (current_state != kDeviceStateIdle) {
             vTaskDelay(pdMS_TO_TICKS(50));
             continue;
         }
@@ -764,6 +778,7 @@ void Esp32Music::PlayAudioStream() {
                     codec->EnableOutput(true);
                 }
                 codec->OutputData(resampled_buffer);
+                Application::GetInstance().GetAudioService().NoteExternalOutput();
                 size_t frame_bytes = resampled_buffer.size() * sizeof(int16_t);
                 bool first_audio = (total_played == 0);
                 total_played += frame_bytes;
