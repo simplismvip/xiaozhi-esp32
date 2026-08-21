@@ -1020,7 +1020,6 @@ void Application::SetHomeMode(bool home_visible) {
 
 void Application::StartIdleDimTimer() {
     CancelIdleDimTimer();
-    idle_dim_phase_ = 0;
     esp_timer_create_args_t args = {
         .callback =
             [](void* arg) {
@@ -1035,8 +1034,7 @@ void Application::StartIdleDimTimer() {
     if (idle_dim_timer_ == nullptr) {
         ESP_ERROR_CHECK(esp_timer_create(&args, &idle_dim_timer_));
     }
-    // Phase 0: dim after 30s.
-    ESP_ERROR_CHECK(esp_timer_start_once(idle_dim_timer_, 30 * 1000 * 1000ULL));
+    ESP_ERROR_CHECK(esp_timer_start_once(idle_dim_timer_, 5 * 60 * 1000 * 1000ULL));
 }
 
 void Application::CancelIdleDimTimer() {
@@ -1051,16 +1049,6 @@ void Application::OnIdleDimTimer() {
     }
     auto* bl = Board::GetInstance().GetBacklight();
     if (bl == nullptr) {
-        return;
-    }
-    if (idle_dim_phase_ == 0) {
-        bl->SetBrightness(20, false);
-        idle_dim_phase_ = 1;
-        // Phase 1: blank at 5 minutes total idle (4.5 minutes after dim).
-        if (idle_dim_timer_ != nullptr) {
-            ESP_ERROR_CHECK(
-                esp_timer_start_once(idle_dim_timer_, (5 * 60 - 30) * 1000 * 1000ULL));
-        }
         return;
     }
     bl->SetBrightness(0, false);

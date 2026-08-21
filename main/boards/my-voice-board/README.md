@@ -84,7 +84,7 @@ idf.py -p /dev/cu.usbserial-XXXX flash monitor
 - Top bar: Wi-Fi + battery (existing)
 - **Idle**: home panel with large clock, date, weather/TH from `CONFIG_HOME_ENV_URL` (Pi `xiaozhi-apis` `/api/weather`), and wake hint `说“小智”开始对话`
 - **Chat**: home panel hidden; LVGL `GrokbotEmotionAnimator` + subtitles shown (see [Emotions](#emotions))
-- Backlight: 30s after entering idle → 20% (not written to NVS); leave idle restores saved brightness
+- Backlight: 5 minutes after entering idle → 0 (not written to NVS); leave idle restores saved brightness
 - Live weather/TH: HTTP GET on idle enter and about every 10 minutes; fields `weather` / `temp` / `humidity_text`
 
 Idle home appearance (2026-08-14):
