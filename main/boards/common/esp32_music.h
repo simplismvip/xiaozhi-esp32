@@ -27,6 +27,10 @@ private:
     std::string last_downloaded_data_;
     std::string current_music_url_;
     std::string current_song_name_;
+    std::string current_artist_;
+    std::string current_lyrics_;
+    std::atomic<int> duration_ms_{0};
+    std::atomic<int> position_ms_{0};
 
     std::atomic<bool> is_playing_;
     std::atomic<bool> is_downloading_;
@@ -58,6 +62,8 @@ private:
     // Returns false on parse/play failure. Sets current_music_id_ / song name / url.
     bool ApplyResolveJson(const std::string& json);
     bool FetchAdjacent(const char* dir);  // "next" or "prev"
+    void PushNowPlayingToDisplay();
+    void PushProgressToDisplay();
 
 public:
     Esp32Music();

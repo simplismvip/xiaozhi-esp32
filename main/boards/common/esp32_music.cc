@@ -220,6 +220,36 @@ bool Esp32Music::ApplyResolveJson(const std::string& json) {
     }
     current_music_url_ = stream_url->valuestring;
 
+    cJSON* artist = cJSON_GetObjectItem(root, "artist");
+    if (cJSON_IsString(artist) && artist->valuestring) {
+        current_artist_ = artist->valuestring;
+    } else {
+        current_artist_.clear();
+    }
+
+    cJSON* duration = cJSON_GetObjectItem(root, "duration");
+    if (cJSON_IsNumber(duration) && duration->valuedouble > 0) {
+        duration_ms_.store(static_cast<int>(duration->valuedouble * 1000.0));
+    } else {
+        duration_ms_.store(0);
+    }
+
+    current_lyrics_.clear();
+    auto take_lyrics = [this](cJSON* item) {
+        if (!cJSON_IsString(item) || item->valuestring == nullptr || item->valuestring[0] == '\0') {
+            return false;
+        }
+        current_lyrics_ = item->valuestring;
+        constexpr size_t kMaxLyrics = 4096;
+        if (current_lyrics_.size() > kMaxLyrics) {
+            current_lyrics_.resize(kMaxLyrics);
+        }
+        return true;
+    };
+    if (!take_lyrics(cJSON_GetObjectItem(root, "lyric_lrc"))) {
+        take_lyrics(cJSON_GetObjectItem(root, "lyrics"));
+    }
+
     cJSON* id_item = cJSON_GetObjectItem(root, "id");
     if (cJSON_IsNumber(id_item)) {
         current_music_id_ = static_cast<int32_t>(id_item->valuedouble);
@@ -244,11 +274,7 @@ bool Esp32Music::Pause() {
     }
     is_paused_ = true;
     ESP_LOGI(TAG, "Music paused (id=%d)", (int)current_music_id_);
-    auto display = Board::GetInstance().GetDisplay();
-    if (display && !current_song_name_.empty()) {
-        std::string status = "《" + current_song_name_ + "》已暂停";
-        display->SetStatus(status.c_str());
-    }
+    PushNowPlayingToDisplay();
     return true;
 }
 
@@ -267,11 +293,7 @@ bool Esp32Music::Resume() {
         codec->EnableOutput(true);
     }
     ESP_LOGI(TAG, "Music resumed (id=%d)", (int)current_music_id_);
-    auto display = Board::GetInstance().GetDisplay();
-    if (display && !current_song_name_.empty()) {
-        std::string status = "《" + current_song_name_ + "》播放中";
-        display->SetStatus(status.c_str());
-    }
+    PushNowPlayingToDisplay();
     return true;
 }
 
@@ -322,7 +344,12 @@ bool Esp32Music::StartStreaming(const std::string& music_url) {
 
     is_playing_ = false;
     is_downloading_ = true;
-    Application::GetInstance().Schedule([]() { Application::GetInstance().DismissChatForMusic(); });
+    position_ms_.store(0);
+    Application::GetInstance().Schedule([]() {
+        auto& app = Application::GetInstance();
+        app.DismissChatForMusic();
+        app.RefreshIdleDisplay();
+    });
 
     if (download_thread_.joinable()) {
         {
@@ -360,6 +387,7 @@ bool Esp32Music::StartStreaming(const std::string& music_url) {
     is_playing_ = true;
     play_thread_ = std::thread(&Esp32Music::PlayAudioStream, this);
 
+    PushNowPlayingToDisplay();
     ESP_LOGI(TAG, "Streaming threads started");
     return true;
 }
@@ -422,6 +450,7 @@ bool Esp32Music::StopStreaming() {
     }
 
     ClearAudioBuffer();
+    Application::GetInstance().Schedule([]() { Application::GetInstance().RefreshIdleDisplay(); });
     ESP_LOGI(TAG, "Music streaming stopped");
     return true;
 }
@@ -562,13 +591,8 @@ void Esp32Music::PlayAudioStream() {
 
     ESP_LOGI(TAG, "Starting playback with buffer size: %u", (unsigned)buffer_size_);
 
-    if (!current_song_name_.empty()) {
-        auto display = Board::GetInstance().GetDisplay();
-        if (display) {
-            std::string status = "《" + current_song_name_ + "》播放中";
-            display->SetStatus(status.c_str());
-        }
-    }
+    PushNowPlayingToDisplay();
+    Application::GetInstance().Schedule([]() { Application::GetInstance().RefreshIdleDisplay(); });
 
     size_t total_played = 0;
     uint8_t* mp3_input_buffer = (uint8_t*)heap_caps_malloc(8192, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -597,6 +621,7 @@ void Esp32Music::PlayAudioStream() {
     uint8_t* read_ptr = nullptr;
     bool id3_header_checked = false;
     size_t decode_error_count = 0;
+    int last_ui_position_ms = -250;
 
     while (is_playing_) {
         auto& app = Application::GetInstance();
@@ -779,6 +804,14 @@ void Esp32Music::PlayAudioStream() {
                 }
                 codec->OutputData(resampled_buffer);
                 Application::GetInstance().GetAudioService().NoteExternalOutput();
+                if (mp3_frame_info_.samprate > 0) {
+                    position_ms_.fetch_add((final_sample_count * 1000) / mp3_frame_info_.samprate);
+                }
+                int pos = position_ms_.load();
+                if (pos - last_ui_position_ms >= 250) {
+                    last_ui_position_ms = pos;
+                    PushProgressToDisplay();
+                }
                 size_t frame_bytes = resampled_buffer.size() * sizeof(int16_t);
                 bool first_audio = (total_played == 0);
                 total_played += frame_bytes;
@@ -812,12 +845,37 @@ void Esp32Music::PlayAudioStream() {
     }
     is_playing_ = false;
 
-    auto display = Board::GetInstance().GetDisplay();
-    if (display) {
-        display->SetStatus("");
-    }
+    Application::GetInstance().Schedule([]() { Application::GetInstance().RefreshIdleDisplay(); });
 
     ESP_LOGI(TAG, "Audio stream playback finished, total played: %u bytes", (unsigned)total_played);
+}
+
+void Esp32Music::PushNowPlayingToDisplay() {
+    Display::NowPlayingInfo info;
+    info.title = current_song_name_;
+    info.artist = current_artist_;
+    info.lyrics = current_lyrics_;
+    info.duration_ms = duration_ms_.load();
+    info.position_ms = position_ms_.load();
+    info.paused = is_paused_.load();
+    Application::GetInstance().Schedule([info = std::move(info)]() {
+        auto display = Board::GetInstance().GetDisplay();
+        if (display) {
+            display->SetNowPlaying(info);
+        }
+    });
+}
+
+void Esp32Music::PushProgressToDisplay() {
+    int pos = position_ms_.load();
+    int dur = duration_ms_.load();
+    bool paused = is_paused_.load();
+    Application::GetInstance().Schedule([pos, dur, paused]() {
+        auto display = Board::GetInstance().GetDisplay();
+        if (display) {
+            display->SetNowPlayingProgress(pos, dur, paused);
+        }
+    });
 }
 
 void Esp32Music::ClearAudioBuffer() {

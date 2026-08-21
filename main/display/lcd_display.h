@@ -8,8 +8,13 @@
 #include <esp_lcd_panel_ops.h>
 #include <atomic>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
+
+class LvglTheme;
 
 class LcdDisplay : public LvglDisplay {
 protected:
@@ -42,6 +47,27 @@ protected:
     lv_obj_t* home_wake_hint_label_ = nullptr;
     bool home_visible_ = false;
 
+    lv_obj_t* now_playing_panel_ = nullptr;
+    lv_obj_t* now_playing_title_label_ = nullptr;
+    lv_obj_t* now_playing_artist_label_ = nullptr;
+    lv_obj_t* now_playing_lyrics_label_ = nullptr;
+    lv_obj_t* now_playing_prev_label_ = nullptr;
+    lv_obj_t* now_playing_play_label_ = nullptr;
+    lv_obj_t* now_playing_next_label_ = nullptr;
+    lv_obj_t* now_playing_bar_ = nullptr;
+    lv_obj_t* now_playing_elapsed_label_ = nullptr;
+    lv_obj_t* now_playing_total_label_ = nullptr;
+    bool now_playing_visible_ = false;
+    bool now_playing_has_lrc_ = false;
+    std::string now_playing_plain_lyrics_;
+    std::vector<std::pair<int, std::string>> now_playing_lrc_;
+    int now_playing_duration_ms_ = 0;
+
+    void CreateNowPlayingPanel(LvglTheme* theme, const lv_font_t* text_font);
+    void ParseNowPlayingLyrics(const std::string& lyrics);
+    void UpdateNowPlayingLyrics(int position_ms);
+    void ApplyNowPlayingProgress(int position_ms, int duration_ms, bool paused);
+
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
@@ -66,6 +92,11 @@ public:
     virtual void SetHomeEnvironment(const char* weather_text, const char* temp_text,
                                     const char* humidity_text) override;
     virtual void SetHomeClock(const char* time_text, const char* date_text) override;
+
+    virtual void SetNowPlayingVisible(bool visible) override;
+    virtual bool IsNowPlayingVisible() const override { return now_playing_visible_; }
+    virtual void SetNowPlaying(const NowPlayingInfo& info) override;
+    virtual void SetNowPlayingProgress(int position_ms, int duration_ms, bool paused) override;
 
     // Set whether to hide chat messages/subtitles
     void SetHideSubtitle(bool hide);

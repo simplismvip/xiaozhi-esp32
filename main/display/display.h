@@ -59,6 +59,24 @@ public:
         (void)date_text;
     }
 
+    // Now-playing page (music). No-ops on displays without the panel.
+    struct NowPlayingInfo {
+        std::string title;
+        std::string artist;
+        std::string lyrics;
+        int duration_ms = 0;
+        int position_ms = 0;
+        bool paused = false;
+    };
+    virtual void SetNowPlayingVisible(bool visible) { (void)visible; }
+    virtual bool IsNowPlayingVisible() const { return false; }
+    virtual void SetNowPlaying(const NowPlayingInfo& info) { (void)info; }
+    virtual void SetNowPlayingProgress(int position_ms, int duration_ms, bool paused) {
+        (void)position_ms;
+        (void)duration_ms;
+        (void)paused;
+    }
+
     virtual bool AddTextGlyphs(const std::vector<TextGlyph>& glyphs, uint8_t bpp) { return false; }
     virtual void ClearTextGlyphs() {}
     virtual void SetEmojiCollection(std::shared_ptr<EmojiCollection>) {}

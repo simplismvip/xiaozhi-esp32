@@ -124,6 +124,12 @@ public:
     void DismissChatForMusic();
 
     /**
+     * Show idle home or the now-playing page depending on whether music is active.
+     * Must run on the main loop.
+     */
+    void RefreshIdleDisplay();
+
+    /**
      * Reset protocol resources (thread-safe)
      * Can be called from any task to release resources allocated after network connected
      * This includes closing audio channel, resetting protocol and ota objects

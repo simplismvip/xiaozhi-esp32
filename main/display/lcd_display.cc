@@ -12,12 +12,75 @@
 #include <noto_emoji.h>
 #include <src/misc/cache/lv_cache.h>
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
 #include "board.h"
 
 #define TAG "LcdDisplay"
+
+namespace {
+
+std::string FormatMmSs(int ms) {
+    if (ms < 0) {
+        ms = 0;
+    }
+    int total_sec = ms / 1000;
+    int min = total_sec / 60;
+    int sec = total_sec % 60;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d:%02d", min, sec);
+    return buf;
+}
+
+bool LooksLikeLrc(const std::string& lyrics) {
+    return lyrics.find('[') != std::string::npos && lyrics.find(']') != std::string::npos;
+}
+
+int ParseLrcTimestampMs(const char*& p) {
+    if (*p != '[') {
+        return -1;
+    }
+    const char* s = p + 1;
+    int min = 0;
+    int sec = 0;
+    int frac = 0;
+    int frac_digits = 0;
+    bool in_frac = false;
+    bool saw_colon = false;
+    while (*s && *s != ']') {
+        if (*s == ':') {
+            saw_colon = true;
+            in_frac = false;
+        } else if (*s == '.' || *s == ',') {
+            in_frac = true;
+        } else if (*s >= '0' && *s <= '9') {
+            if (!saw_colon) {
+                min = min * 10 + (*s - '0');
+            } else if (!in_frac) {
+                sec = sec * 10 + (*s - '0');
+            } else if (frac_digits < 3) {
+                frac = frac * 10 + (*s - '0');
+                frac_digits++;
+            }
+        } else {
+            return -1;
+        }
+        s++;
+    }
+    if (*s != ']' || !saw_colon) {
+        return -1;
+    }
+    while (frac_digits < 3) {
+        frac *= 10;
+        frac_digits++;
+    }
+    p = s + 1;
+    return min * 60000 + sec * 1000 + frac;
+}
+
+}  // namespace
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
@@ -328,6 +391,19 @@ LcdDisplay::~LcdDisplay() {
         home_temp_label_ = nullptr;
         home_humidity_label_ = nullptr;
         home_wake_hint_label_ = nullptr;
+    }
+    if (now_playing_panel_ != nullptr) {
+        lv_obj_del(now_playing_panel_);
+        now_playing_panel_ = nullptr;
+        now_playing_title_label_ = nullptr;
+        now_playing_artist_label_ = nullptr;
+        now_playing_lyrics_label_ = nullptr;
+        now_playing_prev_label_ = nullptr;
+        now_playing_play_label_ = nullptr;
+        now_playing_next_label_ = nullptr;
+        now_playing_bar_ = nullptr;
+        now_playing_elapsed_label_ = nullptr;
+        now_playing_total_label_ = nullptr;
     }
     if (content_ != nullptr) {
         lv_obj_del(content_);
@@ -1166,6 +1242,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
     lv_obj_center(low_battery_label_);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+
+    CreateNowPlayingPanel(lvgl_theme, text_font);
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -1253,6 +1331,12 @@ void LcdDisplay::ClearChatMessages() {
 void LcdDisplay::SetHomeVisible(bool visible) {
     DisplayLockGuard lock(this);
     home_visible_ = visible;
+    if (visible) {
+        now_playing_visible_ = false;
+        if (now_playing_panel_ != nullptr) {
+            lv_obj_add_flag(now_playing_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
     if (home_panel_ == nullptr) {
         return;
     }
@@ -1266,7 +1350,7 @@ void LcdDisplay::SetHomeVisible(bool visible) {
         }
     } else {
         lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_HIDDEN);
-        if (emoji_box_ != nullptr) {
+        if (emoji_box_ != nullptr && !now_playing_visible_) {
             lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
         }
         // Leave bottom_bar_ visibility alone; SetChatMessage / SetHideSubtitle own it.
@@ -1295,6 +1379,280 @@ void LcdDisplay::SetHomeClock(const char* time_text, const char* date_text) {
     if (home_date_label_ != nullptr && date_text != nullptr) {
         lv_label_set_text(home_date_label_, date_text);
     }
+}
+
+void LcdDisplay::CreateNowPlayingPanel(LvglTheme* theme, const lv_font_t* text_font) {
+    auto screen = lv_screen_active();
+    const int status_chrome_h = theme->spacing(2) * 2 + 16;
+
+    now_playing_panel_ = lv_obj_create(screen);
+    lv_obj_set_size(now_playing_panel_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_bg_opa(now_playing_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(now_playing_panel_, 0, 0);
+    lv_obj_set_style_pad_top(now_playing_panel_, status_chrome_h + 8, 0);
+    lv_obj_set_style_pad_bottom(now_playing_panel_, 8, 0);
+    lv_obj_set_style_pad_hor(now_playing_panel_, 16, 0);
+    lv_obj_set_flex_flow(now_playing_panel_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(now_playing_panel_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(now_playing_panel_, 6, 0);
+    lv_obj_align(now_playing_panel_, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_add_flag(now_playing_panel_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(now_playing_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(now_playing_panel_, LV_SCROLLBAR_MODE_OFF);
+
+    now_playing_title_label_ = lv_label_create(now_playing_panel_);
+    lv_obj_set_width(now_playing_title_label_, LV_PCT(100));
+    lv_label_set_long_mode(now_playing_title_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_align(now_playing_title_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(now_playing_title_label_, text_font, 0);
+    lv_obj_set_style_text_color(now_playing_title_label_, theme->text_color(), 0);
+    lv_label_set_text(now_playing_title_label_, "");
+
+    now_playing_artist_label_ = lv_label_create(now_playing_panel_);
+    lv_obj_set_width(now_playing_artist_label_, LV_PCT(100));
+    lv_label_set_long_mode(now_playing_artist_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_align(now_playing_artist_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(now_playing_artist_label_, text_font, 0);
+    lv_obj_set_style_text_color(now_playing_artist_label_, lv_color_hex(0x9CA3AF), 0);
+    lv_label_set_text(now_playing_artist_label_, "");
+
+    now_playing_lyrics_label_ = lv_label_create(now_playing_panel_);
+    lv_obj_set_width(now_playing_lyrics_label_, LV_PCT(100));
+    lv_obj_set_flex_grow(now_playing_lyrics_label_, 1);
+    lv_label_set_long_mode(now_playing_lyrics_label_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(now_playing_lyrics_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(now_playing_lyrics_label_, text_font, 0);
+    lv_obj_set_style_text_color(now_playing_lyrics_label_, theme->text_color(), 0);
+    lv_label_set_text(now_playing_lyrics_label_, "暂无歌词");
+
+    lv_obj_t* controls = lv_obj_create(now_playing_panel_);
+    lv_obj_set_width(controls, LV_PCT(100));
+    lv_obj_set_height(controls, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(controls, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(controls, 0, 0);
+    lv_obj_set_style_pad_all(controls, 0, 0);
+    lv_obj_set_flex_flow(controls, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(controls, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(controls, LV_OBJ_FLAG_SCROLLABLE);
+
+    auto make_ctrl = [controls, text_font, theme](const char* text) {
+        lv_obj_t* label = lv_label_create(controls);
+        lv_obj_set_style_text_font(label, text_font, 0);
+        lv_obj_set_style_text_color(label, theme->text_color(), 0);
+        lv_obj_set_style_text_opa(label, LV_OPA_70, 0);
+        lv_label_set_text(label, text);
+        return label;
+    };
+    now_playing_prev_label_ = make_ctrl("上一曲");
+    now_playing_play_label_ = make_ctrl("暂停");
+    now_playing_next_label_ = make_ctrl("下一曲");
+
+    now_playing_bar_ = lv_bar_create(now_playing_panel_);
+    lv_obj_set_width(now_playing_bar_, LV_PCT(100));
+    lv_obj_set_height(now_playing_bar_, 6);
+    lv_bar_set_range(now_playing_bar_, 0, 1000);
+    lv_bar_set_value(now_playing_bar_, 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(now_playing_bar_, lv_color_hex(0x374151), 0);
+    lv_obj_set_style_bg_opa(now_playing_bar_, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(now_playing_bar_, lv_color_hex(0x7DD3FC), LV_PART_INDICATOR);
+    lv_obj_set_style_radius(now_playing_bar_, 3, 0);
+    lv_obj_set_style_radius(now_playing_bar_, 3, LV_PART_INDICATOR);
+
+    lv_obj_t* times = lv_obj_create(now_playing_panel_);
+    lv_obj_set_width(times, LV_PCT(100));
+    lv_obj_set_height(times, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(times, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(times, 0, 0);
+    lv_obj_set_style_pad_all(times, 0, 0);
+    lv_obj_set_flex_flow(times, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(times, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(times, LV_OBJ_FLAG_SCROLLABLE);
+
+    now_playing_elapsed_label_ = lv_label_create(times);
+    lv_obj_set_style_text_font(now_playing_elapsed_label_, text_font, 0);
+    lv_obj_set_style_text_color(now_playing_elapsed_label_, lv_color_hex(0x9CA3AF), 0);
+    lv_label_set_text(now_playing_elapsed_label_, "0:00");
+
+    now_playing_total_label_ = lv_label_create(times);
+    lv_obj_set_style_text_font(now_playing_total_label_, text_font, 0);
+    lv_obj_set_style_text_color(now_playing_total_label_, lv_color_hex(0x9CA3AF), 0);
+    lv_label_set_text(now_playing_total_label_, "0:00");
+}
+
+void LcdDisplay::ParseNowPlayingLyrics(const std::string& lyrics) {
+    now_playing_lrc_.clear();
+    now_playing_plain_lyrics_.clear();
+    now_playing_has_lrc_ = false;
+    if (lyrics.empty()) {
+        return;
+    }
+    if (!LooksLikeLrc(lyrics)) {
+        now_playing_plain_lyrics_ = lyrics;
+        return;
+    }
+
+    size_t i = 0;
+    while (i < lyrics.size()) {
+        size_t nl = lyrics.find('\n', i);
+        if (nl == std::string::npos) {
+            nl = lyrics.size();
+        }
+        std::string line = lyrics.substr(i, nl - i);
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        i = (nl == lyrics.size()) ? lyrics.size() : nl + 1;
+
+        const char* p = line.c_str();
+        std::vector<int> times;
+        while (*p == '[') {
+            const char* save = p;
+            int ms = ParseLrcTimestampMs(p);
+            if (ms < 0) {
+                p = save;
+                break;
+            }
+            times.push_back(ms);
+        }
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (times.empty()) {
+            continue;
+        }
+        std::string text = p;
+        if (text.empty()) {
+            continue;
+        }
+        for (int t : times) {
+            now_playing_lrc_.push_back({t, text});
+        }
+        if (now_playing_lrc_.size() >= 256) {
+            break;
+        }
+    }
+    std::sort(now_playing_lrc_.begin(), now_playing_lrc_.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    now_playing_has_lrc_ = !now_playing_lrc_.empty();
+    if (!now_playing_has_lrc_) {
+        now_playing_plain_lyrics_ = lyrics;
+    }
+}
+
+void LcdDisplay::UpdateNowPlayingLyrics(int position_ms) {
+    if (now_playing_lyrics_label_ == nullptr) {
+        return;
+    }
+    if (!now_playing_has_lrc_) {
+        if (now_playing_plain_lyrics_.empty()) {
+            lv_label_set_text(now_playing_lyrics_label_, "暂无歌词");
+        } else {
+            lv_label_set_text(now_playing_lyrics_label_, now_playing_plain_lyrics_.c_str());
+        }
+        return;
+    }
+
+    int idx = 0;
+    for (size_t i = 0; i < now_playing_lrc_.size(); ++i) {
+        if (now_playing_lrc_[i].first <= position_ms) {
+            idx = static_cast<int>(i);
+        } else {
+            break;
+        }
+    }
+    int start = std::max(0, idx - 1);
+    int end = std::min(static_cast<int>(now_playing_lrc_.size()) - 1, idx + 2);
+    std::string shown;
+    for (int i = start; i <= end; ++i) {
+        if (i == idx) {
+            shown += "> ";
+            shown += now_playing_lrc_[i].second;
+        } else {
+            shown += now_playing_lrc_[i].second;
+        }
+        if (i != end) {
+            shown += "\n";
+        }
+    }
+    lv_label_set_text(now_playing_lyrics_label_, shown.c_str());
+}
+
+void LcdDisplay::ApplyNowPlayingProgress(int position_ms, int duration_ms, bool paused) {
+    if (duration_ms < 0) {
+        duration_ms = 0;
+    }
+    if (position_ms < 0) {
+        position_ms = 0;
+    }
+    if (duration_ms > 0 && position_ms > duration_ms) {
+        position_ms = duration_ms;
+    }
+    now_playing_duration_ms_ = duration_ms;
+    if (now_playing_bar_ != nullptr) {
+        int value = 0;
+        if (duration_ms > 0) {
+            value = static_cast<int>((static_cast<int64_t>(position_ms) * 1000) / duration_ms);
+        }
+        lv_bar_set_value(now_playing_bar_, value, LV_ANIM_OFF);
+    }
+    if (now_playing_elapsed_label_ != nullptr) {
+        lv_label_set_text(now_playing_elapsed_label_, FormatMmSs(position_ms).c_str());
+    }
+    if (now_playing_total_label_ != nullptr) {
+        lv_label_set_text(now_playing_total_label_, FormatMmSs(duration_ms).c_str());
+    }
+    if (now_playing_play_label_ != nullptr) {
+        lv_label_set_text(now_playing_play_label_, paused ? "播放" : "暂停");
+    }
+    UpdateNowPlayingLyrics(position_ms);
+}
+
+void LcdDisplay::SetNowPlayingVisible(bool visible) {
+    DisplayLockGuard lock(this);
+    now_playing_visible_ = visible;
+    if (now_playing_panel_ == nullptr) {
+        return;
+    }
+    if (visible) {
+        home_visible_ = false;
+        lv_obj_remove_flag(now_playing_panel_, LV_OBJ_FLAG_HIDDEN);
+        if (home_panel_ != nullptr) {
+            lv_obj_add_flag(home_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_box_ != nullptr) {
+            lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (bottom_bar_ != nullptr) {
+            lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+        }
+    } else {
+        lv_obj_add_flag(now_playing_panel_, LV_OBJ_FLAG_HIDDEN);
+        if (emoji_box_ != nullptr && !home_visible_) {
+            lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void LcdDisplay::SetNowPlaying(const NowPlayingInfo& info) {
+    DisplayLockGuard lock(this);
+    if (now_playing_title_label_ != nullptr) {
+        lv_label_set_text(now_playing_title_label_,
+                          info.title.empty() ? "未知歌曲" : info.title.c_str());
+    }
+    if (now_playing_artist_label_ != nullptr) {
+        lv_label_set_text(now_playing_artist_label_,
+                          info.artist.empty() ? "未知歌手" : info.artist.c_str());
+    }
+    ParseNowPlayingLyrics(info.lyrics);
+    ApplyNowPlayingProgress(info.position_ms, info.duration_ms, info.paused);
+}
+
+void LcdDisplay::SetNowPlayingProgress(int position_ms, int duration_ms, bool paused) {
+    DisplayLockGuard lock(this);
+    ApplyNowPlayingProgress(position_ms, duration_ms, paused);
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
@@ -1471,6 +1829,31 @@ void LcdDisplay::SetTheme(Theme* theme) {
         lv_obj_set_style_transform_pivot_x(home_time_label_, LV_PCT(50), 0);
         lv_obj_set_style_transform_pivot_y(home_time_label_, LV_PCT(50), 0);
     }
+
+    if (now_playing_title_label_ != nullptr) {
+        lv_obj_set_style_text_font(now_playing_title_label_, text_font, 0);
+        lv_obj_set_style_text_color(now_playing_title_label_, lvgl_theme->text_color(), 0);
+    }
+    if (now_playing_artist_label_ != nullptr) {
+        lv_obj_set_style_text_font(now_playing_artist_label_, text_font, 0);
+        lv_obj_set_style_text_color(now_playing_artist_label_, lv_color_hex(0x9CA3AF), 0);
+    }
+    if (now_playing_lyrics_label_ != nullptr) {
+        lv_obj_set_style_text_font(now_playing_lyrics_label_, text_font, 0);
+        lv_obj_set_style_text_color(now_playing_lyrics_label_, lvgl_theme->text_color(), 0);
+    }
+    auto rebind_ctrl = [text_font, lvgl_theme](lv_obj_t* label) {
+        if (label == nullptr) {
+            return;
+        }
+        lv_obj_set_style_text_font(label, text_font, 0);
+        lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+    };
+    rebind_ctrl(now_playing_prev_label_);
+    rebind_ctrl(now_playing_play_label_);
+    rebind_ctrl(now_playing_next_label_);
+    rebind_ctrl(now_playing_elapsed_label_);
+    rebind_ctrl(now_playing_total_label_);
 
     // If we have the chat message style, update all message bubbles
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE

@@ -278,7 +278,7 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
-            if (GetDeviceState() == kDeviceStateIdle) {
+            if (GetDeviceState() == kDeviceStateIdle && !display->IsNowPlayingVisible()) {
                 UpdateHomeClock();
                 // Refresh weather/TH about every 10 minutes while idle.
                 if (clock_ticks_ - home_env_last_fetch_tick_ >= 600) {
@@ -1056,6 +1056,30 @@ void Application::SetHomeMode(bool home_visible) {
     }
 }
 
+void Application::RefreshIdleDisplay() {
+    auto display = Board::GetInstance().GetDisplay();
+    auto* music = Board::GetInstance().GetMusic();
+    if (music && music->IsPlaying()) {
+        CancelIdleDimTimer();
+        if (auto* bl = Board::GetInstance().GetBacklight()) {
+            bl->RestoreBrightness();
+        }
+        display->SetStatus("");
+        display->SetNowPlayingVisible(true);
+        return;
+    }
+
+    if (GetDeviceState() != kDeviceStateIdle) {
+        display->SetNowPlayingVisible(false);
+        return;
+    }
+
+    display->SetNowPlayingVisible(false);
+    display->SetStatus(Lang::Strings::STANDBY);
+    SetHomeMode(true);
+    StartIdleDimTimer();
+}
+
 void Application::StartIdleDimTimer() {
     CancelIdleDimTimer();
     esp_timer_create_args_t args = {
@@ -1109,17 +1133,16 @@ void Application::HandleStateChangedEvent() {
         if (auto* bl = board.GetBacklight()) {
             bl->RestoreBrightness();
         }
+        display->SetNowPlayingVisible(false);
         SetHomeMode(false);
     }
 
     switch (new_state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
-            display->SetStatus(Lang::Strings::STANDBY);
             display->ClearChatMessages();    // Clear messages first
             display->SetEmotion("neutral");  // Then set emotion (wechat mode checks child count)
-            SetHomeMode(true);
-            StartIdleDimTimer();
+            RefreshIdleDisplay();
             audio_service_.EnableVoiceProcessing(false);
             // Idle is the only state where music plays; keep AFE wake enabled
             // so a wake word can hard-stop the song and start a new conversation.
